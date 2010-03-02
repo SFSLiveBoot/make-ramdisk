@@ -1,0 +1,6 @@
+# device mapper creates its own device nodes, so ignore these
+KERNEL=="device-mapper",	NAME="mapper/control"
+
+# SCSI devices
+SUBSYSTEM=="block", KERNEL=="sr[0-9]*",	SYMLINK+="scd%n"
+

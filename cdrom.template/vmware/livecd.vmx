@@ -1,0 +1,56 @@
+#!/usr/bin/vmware
+config.version = "8"
+virtualHW.version = "6"
+displayName = "@iso_label@"
+guestOS = "other26xlinux"
+
+memsize = "512"
+MemAllowAutoScaleDown = "TRUE"
+
+ide1:0.autodetect = "TRUE"
+ide1:0.present = "TRUE"
+ide1:0.fileName = "cdrom"
+ide1:0.deviceType = "atapi-cdrom"
+ide1:0.startConnected = "TRUE"
+
+floppy0.startConnected = "FALSE"
+floppy0.fileName = "Auto detect"
+floppy0.autodetect = "TRUE"
+
+ethernet0.present = "TRUE"
+ethernet0.connectionType = "nat"
+ethernet0.addressType = "generated"
+
+host.useFastClock = "False"
+isolation.tools.hgfs.disable = "TRUE"
+virtualHW.productCompatibility = "hosted"
+uuid.action = "create"
+
+tools.upgrade.policy = "manual"
+tools.syncTime = "TRUE"
+tools.remindInstall = "FALSE"
+
+pciBridge0.present = "TRUE"
+svga.autodetect = "TRUE"
+
+usb.present = "TRUE"
+ehci.present = "TRUE"
+
+sound.present = "TRUE"
+sound.fileName = "-1"
+sound.autodetect = "TRUE"
+
+scsi0.present = "TRUE"
+scsi0.virtualDev = "lsilogic"
+scsi0:0.present = "True"
+scsi0:0.fileName = "persistent.vmdk"
+
+sharedFolder.option = "alwaysEnabled"
+sharedFolder0.present = "TRUE"
+sharedFolder0.enabled = "TRUE"
+sharedFolder0.readAccess = "TRUE"
+sharedFolder0.writeAccess = "TRUE"
+sharedFolder0.hostPath = "C:\"
+sharedFolder0.guestName = "hostC"
+sharedFolder0.expiration = "never"
+sharedFolder.maxNum = "1"

@@ -1,0 +1,76 @@
+#!/bin/sh -e
+
+export PATH=/sbin:/bin:/usr/sbin:/usr/bin
+PATH=$PATH:/usr/lib/klibc/bin
+
+trap 'test -z "$quiet" -a "$quiet" -gt "1" || { set; echo $0 exits at [$stage]${brk:+ break=$brk}.; } ; test -x /bin/busybox && exec /bin/busybox sh || exec /bin/sh' 0
+
+. /init.functions
+
+#
+# start main
+#
+
+init_ramdisk
+init_env
+
+enter_stage udev
+test ! -x /sbin/udevd || init_udev
+
+enter_stage modprobe
+if test  -x /sbin/modprobe && test -e /lib/modules;then 
+  init_modprobe
+elif test -e /load-modules;then
+  source /load-modules
+fi
+
+enter_stage netconfig
+test -z "$ip" || init_net $ip
+
+if test -n "$prepdev";then
+  enter_stage prepfs
+  IFS_save="$IFS"
+  IFS=","
+  for dev in $prepdev;do
+    IFS="$IFS_save"
+    prepare_dev $dev
+  done
+fi
+
+enter_stage rootfs
+
+test -n "$root" || auto_root
+
+if test -x /sbin/lvm;then
+  refresh_lvm
+fi
+
+if test -x /usr/lib/uswsusp/resume -a -r /etc/uswsusp.conf;then
+  enter_stage resume
+  /usr/lib/uswsusp/resume || echo "Resume failed."
+fi
+
+if test -n "$root" -a "$root" != "none";then
+  log -n "Mounting root $root.."
+
+  IFS_save="$IFS"
+  IFS="+"
+  for rootpart in $root;do
+    IFS="$IFS_save"
+    mount_rootpart $rootpart
+  done
+  unset IFS_save
+
+  enter_stage union
+  if test "$rcount" = "1";then
+    mount -o move /parts/$rcount $rr
+  else
+    union_parts /parts $rcount $rr
+  fi
+
+  enter_stage finalize
+  test ! -x "$rr/$init" || finalize_boot
+fi
+
+enter_stage finish
+echo "Init finished."

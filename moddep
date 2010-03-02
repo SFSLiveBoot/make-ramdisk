@@ -1,0 +1,67 @@
+#!/bin/sh
+
+outdir="$1"
+shift
+
+KVERS="${KVERS:-`uname -r`}"
+MODDIR="${MODDIR:-/lib/modules/$KVERS}"
+
+trap "exit 1" 10
+
+list_new_nondup() {
+  local existing="$1" new add
+  shift
+  for test1;do
+    add="$test1"
+    for test2 in $existing;do
+      if test "$test1" = "$test2";then
+        add=""
+      fi
+    done
+    if test -n "$add";then
+      new="$new${new:+ }$add"
+      existing="$existing${existing:+ }$add"
+    fi
+  done
+  echo $new
+}
+
+get_deps() {
+  modinfo -F depends $@ | sed -e 's/,/ /g'
+}
+
+to_filenames() {
+  local pat name n=0 found not_found names
+  for name;do
+    if test -z "${name#*.ko}";then echo $name;else
+      names="${names}${names:+ }$name"
+    fi
+  done
+  if test -n "$names";then
+    found="$(grep -E "/($(echo $names | sed -e 's/ /|/g' -e 's/[_-]/[_-]/g'))\\.ko:" "$MODDIR/modules.dep" | cut -f1 -d:)"
+    not_found="$(echo $names | sed -e 's/ /\n/g' | grep -vE "($(echo $found | sed -e 's@[^ ]*/@@g' -e 's/\.ko//g' -e 's/ /|/g' -e 's/[_-]/[_-]/g'))")"
+    test -z "$not_found" || {
+      echo "ERROR: not found:" $not_found >&2
+      kill -10 $$
+    }
+    echo $found | sed -e 's@\(^\| \)\([^/]\)@\1'"$MODDIR"'/\2@g'
+  fi
+}
+
+if test -z "$outdir";then
+  echo "Usage: $0 outdir [modules...]"
+  exit 1
+fi
+
+
+resolv_list="$(to_filenames $@)"
+copy_list="$resolv_list"
+while test -n "$resolv_list";do
+  resolv_list="$(list_new_nondup "$copy_list" $(to_filenames $(get_deps $resolv_list)))"
+  copy_list="$copy_list $resolv_list"
+done
+
+test -e "$outdir" || mkdir -p "$outdir"
+
+cp -v --parents $copy_list "$outdir"
+depmod -b $outdir $KVERS

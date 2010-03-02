@@ -1,0 +1,16 @@
+#!/bin/sh
+
+case "$1" in
+  deconfig)
+    ifconfig $interface 0.0.0.0 up
+  ;;
+  bound)
+    ifconfig $interface $ip netmask $subnet
+    test -z "$router" || route add default gw $router $interface
+    test -z "$dns" || { echo nameserver $dns >/etc/resolv.conf; }
+  ;;
+  *)
+    echo "Unknown args $0: $@"
+    export
+  ;;
+esac

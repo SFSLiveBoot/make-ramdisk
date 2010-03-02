@@ -1,0 +1,381 @@
+#!/bin/sh
+
+voldir=/dev/disk/by-label
+rr=/realroot
+
+#
+# functions
+#
+log () {
+  test -n "$quiet" || echo "$@"
+}
+
+init_udev () {
+  log -n "udev "
+  test -d /dev/.udev || mount -t tmpfs -o size=2M none /dev
+  mkdir -p /dev/.udev/db/ /dev/.udev/queue/
+  test -e /dev/null || mknod /dev/null c 1 3
+  test -e /dev/console || mknod /dev/console c 5 1
+  test -e /dev/tty || mknod /dev/tty c 5 0
+  echo "udev_log=\"$udevl\"" >/etc/udev/udev.conf
+  test -z "$no_volid" || echo "# Disabled with no_volid" >/etc/udev/rules.d/vol_id.rules
+  echo >/proc/sys/kernel/hotplug
+  test -n "`getpids udevd`" || udevd --daemon
+  log -n "generating devices "
+  udevadm trigger
+  udevadm settle
+  log
+}
+
+init_ramdisk () {
+  mkdir -p /sys /proc /tmp $rr /etc/udev /var/log /mnt /parts /usr/sbin /usr/bin /sbin /dev/pts
+  echo -n >>/etc/fstab
+  test -e /etc/mtab -o -L /etc/mtab || ln -s /proc/mounts /etc/mtab
+  test -d /proc/$$ || mount -t proc none /proc 
+  test -d /sys/kernel || mount -t sysfs none /sys
+  echo -n '[9;0]'
+  test ! -x /bin/busybox || busybox --install -s || false
+}
+
+init_modprobe () {
+  local moda modalias mod IFS_save
+  log -n "loading drivers: $drivers"
+  IFS_save="$IFS"
+  IFS=","
+  for mod in $drivers;do
+    modprobe $qswitch $mod || true
+  done
+  IFS="$IFS_save"
+
+  if test -r /etc/modules.preload;then
+    log -n "Pre-loading modules: "
+    while read module ;do
+      log -n $module
+      modprobe $qswitch $module || true
+    done < /etc/modules.preload
+    log
+  fi
+
+  enter_stage pci
+  log -n " PCI"
+  for moda in /sys/bus/pci/devices/*/modalias;do
+    log -n .
+    read modalias <$moda
+    modprobe $qswitch $modalias || true
+  done
+  log
+}
+
+next_mark () {
+  case $1 in
+    "/") echo "-";;
+    "-") echo "\\";;
+    "\\") echo "|";;
+    "|") echo "/";;
+    *) echo "/";;
+  esac
+}
+
+wait_exist() {
+  local device="$1"
+  local timeout="${2:-$dev_tmout}"
+  local devinfo="[$device"
+  while test ! -e "$device" -a "$timeout" != "0";do
+    mark="$(next_mark $mark)"
+    echo -n "$devinfo$mark"
+    devinfo=""
+    sleep 1
+    timeout=$(($timeout-1))
+  done
+  test -n "$devinfo" || echo "]"
+}
+
+fs_type() {
+  blkid -o value -s TYPE "$1" || true
+}
+
+prepare_dev () {
+  local _dev="$1"
+  local timeout="$2"
+  local cryptkey="$gck"
+  test "$_dev" = "${_dev#@}" || _dev="$voldir/${_dev#@}"
+  wait_exist "$_dev" "$timeout"
+  if test -e "$_dev";then
+    local fileext="${_dev##*.}"
+    if ! test -b "$_dev";then
+      modprobe loop
+      while ! test -e /dev/loop0; do sleep 1;done
+      local loopdev=`losetup -f`
+      losetup $loopdev "$_dev"
+      _dev="$loopdev"
+    fi
+    wait_exist "$_dev"
+    local _fs="$(fs_type "$_dev")"
+    if test "$_fs" = "crypto_LUKS" -o "$_fs" = "swap" && cryptsetup isLuks "$_dev";then
+      modprobe dm-crypt
+      if test -z "$cryptkey" ;then
+        if ! cryptsetup -t 20 $cryptopts luksOpen "$_dev" "${_dev##*/}";then
+          echo -n "{$?} $_dev ck: "
+          read cryptkey
+        fi
+      fi
+      if test -n "$cryptkey";then
+        local keydev="${cryptkey%%:*}"
+        if test "$keydev" != "$cryptkey";then
+          cryptkey="/keymnt/${cryptkey#*:}"
+          mkdir -p /keymnt
+          chained_mount "$keydev" /keymnt
+        fi
+        cryptsetup -d "$cryptkey" $cryptopts luksOpen "$_dev" "${_dev##*/}"
+        test -z "$keydev" || umount /keymnt
+      fi
+      _dev="/dev/mapper/${_dev##*/}"
+      wait_exist "$_dev"
+      _fs="$(fs_type $_dev)"
+    fi
+    test -n "$_fs" -o "$fileext" != "sfs" || _fs=squashfs
+    test "$_fs" != "LVM2_member" -o ! -x /sbin/lvm || refresh_lvm
+    prepared_device="$_dev"
+    prepared_filesystem="$_fs"
+  else
+    return 1
+  fi
+}
+
+find_ifaces() {
+  local name="${1:-all}" ifdir="" curif=""
+  for ifdir in /sys/class/net/*;do
+    echo -n "${curif:+ }"
+    curif="${ifdir##*/}"
+    test "$curif" != "lo" || continue
+    test "$name" != "all" || echo -n "$curif"
+    test "$curif" != "$name" || echo -n "$curif"
+  done
+}
+
+wait_ifup() {
+  local  ifaces="$(find_ifaces "$1")" iface="" maxwait="$iface_upwait"
+  test -n "$ifaces" || return 0
+  for iface in $ifaces;do ipconfig -d :::::$iface:off; done
+  while test "$maxwait" -gt 0;do
+    for iface in $ifaces;do
+      if grep -q up /sys/class/net/$iface/operstate;then
+        echo $iface
+        return 0
+      fi
+    done
+    maxwait="$(($maxwait-1))"
+    sleep 1
+  done
+  echo "No interface ($ifaces) become up in $maxwait seconds" >&2
+  return 1
+}
+
+init_net () {
+  log -n "net "
+  local ip="$1"
+  local dns netconf IPV4ADDR IPV4BROADCAST IPV4DNS0 IPV4DNS1 IPV4GATEWAY IPV4NETMASK NISDOMAIN DEVICE DNSDOMAIN iface ROOTSERVER #HOSTNAME
+
+  ipconfig -d 127.0.0.1:::::lo:off
+  case "$ip" in
+    *:*:*:*:*:*:*) ipconfig -o ${dhcp_delay:+-t $dhcp_delay} -d $ip ;;
+    *:dhcp)
+      iface="${ip%:dhcp}"
+      wait_ifup "$iface"
+      ipconfig -o ${dhcp_delay:+-t $dhcp_delay} -d "$iface";;
+    dhcp)
+      wait_ifup all
+      ipconfig -o ${dhcp_delay:+-t $dhcp_delay} -d all
+    ;;
+  esac
+  for netconf in /tmp/net-*.conf;do
+    . $netconf
+    test -z "$DNSDOMAIN" || echo "domain $DNSDOMAIN" >>/etc/resolv.conf
+    test -z "$ROOTSERVER" -o "$ROOTSERVER" = "0.0.0.0" || echo "$ROOTSERVER server" >>/etc/hosts
+    for dns in $IPV4DNS0 $IPV4DNS1;do
+      test "$dns" = "0.0.0.0" || echo "nameserver $dns" >>/etc/resolv.conf
+    done
+  done
+  log
+}
+
+getpids() {
+  local progname="$1" pids="" cmd pid others stat
+  for stat in /proc/[0-9]*/stat;do
+    if read pid cmd others <$stat;then
+      test "($progname)" != "$cmd" || pids="$pids${pids:+ }$pid"
+    fi
+  done
+  echo "$pids"
+}
+
+killall () {
+  local progname="$1" pid
+  pid="`getpids $progname`"
+  test -z "$pid" || kill $pid
+}
+
+get_mount_type () {
+  local mpt="$1"
+  local dev pnt type opts other mnt_type
+  while read dev pnt type opts other;do
+    test "$pnt" != "$mpt" || mnt_type="$type"
+  done </proc/mounts
+  echo $mnt_type
+}
+
+finalize_boot () {
+  killall udevd
+  local migrate_list src mpt opts
+  while read src mpt opts; do
+    case $mpt in
+      /dev|/sys|/live*|/proc) if test -e $rr$mpt || mkdir -p $rr$mpt;then migrate_list="$mpt $migrate_list"; fi;;
+    esac
+  done </proc/mounts
+
+  log -n "Migrating:"
+  for mpt in $migrate_list;do
+    log -n " $mpt"
+    mount -o move $mpt $rr$mpt
+  done
+  test ! -e /etc/resolv.conf || test -e $rr/etc/resolv.conf || test ! -w $rr/etc || cat /etc/resolv.conf >$rr/etc/resolv.conf || true
+  log
+
+  enter_stage runinit
+  test -n "$brk" || exec run-init $rr $init
+}
+
+chained_mount () {
+  local devpath="$1"
+  local mpt="$2"
+
+  local prepath="${devpath%%:*}"
+  local lastpath="${devpath#*:}"
+
+  if test "$prepath" = "$devpath";then
+     # final mount
+     prepare_dev $devpath
+     if test "$prepared_filesystem" = "ntfs" -a -x "$(which ntfs-3g)";then
+       ntfs-3g -o "${mntopts:-ro}" $prepared_device $mpt
+     else
+       mount -o "${mntopts:-ro}" -t $prepared_filesystem $prepared_device $mpt
+     fi
+  else
+    mkdir -p /live
+    test -z "$prepath" || chained_mount $prepath /live
+    chained_mount /live/$lastpath $mpt
+  fi
+}
+
+mount_rootpart () {
+  local rootpart="$1"
+  rcount=${rcount:-0}
+  rcount=$(($rcount+1))
+
+  local mpt=/parts/$rcount
+  mkdir -p $mpt
+
+  log "Mount root part '$rootpart' to $mpt"
+
+  if test "$rootpart" != "${rootpart#[0-9a-z]*:/}";then #nfs pattern [0-9a-z]*:/
+    nfsmount -o intr,v3,udp $rootpart $mpt
+  elif test "$rootpart" = "mem";then #memory
+    mount -t tmpfs none $mpt
+  elif test "${rootpart#[0-9]*[kmgKMG]}" = "";then #memory with size [0-9]*[kmgKMG]
+    mount -t tmpfs -o size=$rootpart none $mpt
+  else
+    chained_mount $rootpart $mpt
+  fi
+}
+
+union_parts () {
+  local partsdir="$1" ucount="$2" destdir="$3" partdst dirs pdir mnt_type sep
+  
+  while test "$ucount" != "0";do
+    pdir="$partsdir/$ucount"
+    dirs="$dirs$sep$pdir"
+    mnt_type="`get_mount_type "$pdir"`"
+    if test "$mnt_type" != "tmpfs" -a -n "$sep";then
+      dirs="$dirs=ro"
+    else
+      mount -o remount,rw none $pdir
+    fi
+    ucount="$(($ucount-1))"
+    sep=":"
+  done
+  log "Union $dirs to $destdir"
+  mount -t aufs -o dirs=$dirs aufs $destdir
+  for part in $partsdir/*;do
+    partdst="$destdir/.${partsdir#/}/${part##*/}"
+    if mkdir -p $partdst;then
+      mount -o move $part $partdst
+    fi
+  done
+}
+
+run_parts() {
+  local dir="$1"
+  shift
+  for script in "$dir"/*;do
+    test ! -x "$script" || "$script" "$@"
+  done
+}
+
+enter_stage () {
+  set +x
+  stage="$1"
+  test -z "$verbose" || echo "[$stage]"
+  test "$brk" != "$stage" || exit
+  test "$verbose" != "$stage" || set -x
+  test ! -r "/scripts/$stage" || . "/scripts/$stage"
+  test ! -d "/scripts/$stage.d" || run_parts "/scripts/$stage.d"
+}
+
+init_env () {
+  local cmd cmdline var val
+  init="/sbin/init"
+  udevl="err"
+  drivers="sd-mod,sr-mod,ide-disk,ide-cd,usb-storage,dm-mod,usbhid"
+  dev_tmout=35
+  dhcp_delay=5
+  iface_upwait=10
+  test ! -r /cmdline || cmdlinefile=/cmdline
+  read cmdline <${cmdlinefile:-/proc/cmdline}
+  for cmd in $cmdline;do
+    case "$cmd" in
+      *=*) eval "$cmd" || true;;
+      no_volid) no_volid=1 ;;
+      quiet) quiet="1" qswitch="-q" ;;
+      quiet=*) quiet="${cmd#quiet=}" qswitch="-q" ;;
+      verbose=*|verbose) qswitch="-v" verbose="${cmd#verbose=}" ;;
+      break=*) brk="${cmd#break=}" ;;
+      break) brk="finalize" ;;
+    esac
+  done
+}
+
+auto_root() {
+  local major minor blocks name devs
+  while read major minor blocks name; do
+    test -e "/dev/$name" || continue
+    devs="$devs${devs:+ }$name"
+  done < /proc/partitions
+  for name in $devs;do
+    if test "$(fs_type "/dev/$name")" = "crypto_LUKS";then
+      if prepare_dev /dev/$name && prepare_dev @ROOT 5;then
+        root=$prepared_device
+        break
+      fi
+    fi
+  done
+  test -n "$root" || {
+    if prepare_dev @ROOT 5;then
+      root=$prepared_device
+    fi
+  }
+}
+
+refresh_lvm() {
+  rm -f /etc/lvm/cache/.cache
+  lvm vgchange -a y
+}

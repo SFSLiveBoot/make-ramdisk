@@ -1,0 +1,13 @@
+terminal --silent
+hiddenmenu
+timeout 2
+
+splashimage (cd)/boot/logo.xpm.gz
+
+title Boot @iso_label@
+	kernel (cd)/boot/vmlinuz root=@root_dev@@fs_parts@+@last_fs@ video=vesa:ywrap,mtrr vga=788 quiet
+	initrd (cd)/boot/ramdisk
+
+title Boot @iso_label@ from /dev/sr0
+	kernel (cd)/boot/vmlinuz root=/dev/sr0@fs_parts@+64M video=vesa:ywrap,mtrr vga=788 quiet no_volid
+	initrd (cd)/boot/ramdisk

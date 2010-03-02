@@ -1,0 +1,5 @@
+#!/bin/sh
+
+for devdir in /sys/bus/pci/devices/*;do
+  modprobe $@ `cat $devdir/modalias`
+done

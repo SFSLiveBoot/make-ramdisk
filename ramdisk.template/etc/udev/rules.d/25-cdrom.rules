@@ -1,0 +1,12 @@
+
+ACTION!="add", GOTO="cdrom_end"
+
+KERNEL=="sr[0-9]*", IMPORT{program}="cdrom_id --export $tempnode"
+KERNEL=="hd[a-z]|pcd[0-9]*", DRIVERS=="ide-cdrom|pcd",	IMPORT{program}="cdrom_id --export $tempnode"
+
+ENV{ID_CDROM}=="?*",		SYMLINK+="cdrom"
+ENV{ID_CDROM_CD_RW}=="?*",	SYMLINK+="cdrw"
+ENV{ID_CDROM_DVD}=="?*",	SYMLINK+="dvd"
+ENV{ID_CDROM_DVD_R}=="?*",	SYMLINK+="dvdrw"
+
+LABEL="cdrom_end"
