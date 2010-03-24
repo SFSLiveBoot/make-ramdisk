@@ -1,6 +1,12 @@
 #!/bin/sh
 
 outdir="$1"
+
+if test -z "$outdir";then
+  echo "Usage: $0 outdir [modules...]"
+  exit 1
+fi
+
 shift
 
 KVERS="${KVERS:-`uname -r`}"
@@ -48,10 +54,6 @@ to_filenames() {
   fi
 }
 
-if test -z "$outdir";then
-  echo "Usage: $0 outdir [modules...]"
-  exit 1
-fi
 
 
 resolv_list="$(to_filenames $@)"
@@ -63,5 +65,13 @@ done
 
 test -e "$outdir" || mkdir -p "$outdir"
 
+for firmware in $(modinfo -F firmware $copy_list);do
+  fw_file="/lib/firmware/$firmware"
+  if test -e "$fw_file";then
+    copy_list="$copy_list $(list_new_nondup "$copy_list" $fw_file)"
+  else
+    echo "WARN: missing firmware: $firmware" >&2
+  fi
+done
 cp -v --parents $copy_list "$outdir"
 depmod -b $outdir $KVERS

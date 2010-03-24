@@ -2,6 +2,12 @@
 
 voldir=/dev/disk/by-label
 rr=/realroot
+init="/sbin/init"
+udevl="err"
+drivers="sd-mod,sr-mod,ide-disk,ide-cd,usb-storage,dm-mod,usbhid"
+dev_tmout=35
+dhcp_delay=5
+iface_upwait=10
 
 #
 # functions
@@ -94,11 +100,28 @@ fs_type() {
   blkid -o value -s TYPE "$1" || true
 }
 
+list_partitions() {
+  local major minor blocks name devs spc=""
+  while read major minor blocks name; do
+    test -n "$name" -a -e "/dev/$name" || continue
+    echo -n "$spc/dev/$name"
+    spc=" "
+  done < /proc/partitions
+  test -z "$spc" || echo
+}
+
 prepare_dev () {
   local _dev="$1"
   local timeout="$2"
   local cryptkey="$gck"
-  test "$_dev" = "${_dev#@}" || _dev="$voldir/${_dev#@}"
+  local _l_dev
+  if test -z "${_dev%@*}";then
+    if _l_dev="$(blkid -L "${_dev#@}")";then
+      _dev="$_l_dev"
+    else 
+      _dev="$voldir/${_dev#@}"
+    fi
+  fi
   wait_exist "$_dev" "$timeout"
   if test -e "$_dev";then
     local fileext="${_dev##*.}"
@@ -242,7 +265,12 @@ finalize_boot () {
   log
 
   enter_stage runinit
-  test -n "$brk" || exec run-init $rr $init
+  if test -x $rr$init -a -f $rr$init;then
+    log "End of ramdisk: run-init $rr $init"
+    test -n "$brk" || exec run-init $rr $init
+  else
+    echo "Refusing to run-init: '$init' on '$rr' is not executable file"
+  fi
 }
 
 chained_mount () {
@@ -333,12 +361,6 @@ enter_stage () {
 
 init_env () {
   local cmd cmdline var val
-  init="/sbin/init"
-  udevl="err"
-  drivers="sd-mod,sr-mod,ide-disk,ide-cd,usb-storage,dm-mod,usbhid"
-  dev_tmout=35
-  dhcp_delay=5
-  iface_upwait=10
   test ! -r /cmdline || cmdlinefile=/cmdline
   read cmdline <${cmdlinefile:-/proc/cmdline}
   for cmd in $cmdline;do
@@ -354,15 +376,12 @@ init_env () {
   done
 }
 
+
 auto_root() {
-  local major minor blocks name devs
-  while read major minor blocks name; do
-    test -e "/dev/$name" || continue
-    devs="$devs${devs:+ }$name"
-  done < /proc/partitions
-  for name in $devs;do
-    if test "$(fs_type "/dev/$name")" = "crypto_LUKS";then
-      if prepare_dev /dev/$name && prepare_dev @ROOT 5;then
+  local devname
+  for devname in $(list_partitions);do
+    if test "$(fs_type "$devname")" = "crypto_LUKS";then
+      if prepare_dev $devname && prepare_dev @ROOT 5;then
         root=$prepared_device
         break
       fi

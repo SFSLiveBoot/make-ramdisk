@@ -1,3 +1,4 @@
+SHELL=/bin/bash
 RAMDISK=ramdisk
 RD_DIR=$(RAMDISK).d
 RD_TMPL=ramdisk.template
@@ -27,7 +28,7 @@ NET_DISABLED=arcnet/ phy/ appletalk/ tokenring/ wan/ wireless/ pcmcia/ hamradio/
 NETDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net -name '*.ko' $(patsubst %,-not -path '*/%*',$(NET_DISABLED))))) cifs nfs
 
 USBMODS=sd-mod usb-storage uhci-hcd ehci-hcd ohci-hcd usbhid
-DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/{ata,scsi,ide} -name '*.ko'))) cciss mptspi mptsas ricoh_mmc mmc_block sdhci
+DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/{ata,scsi,ide} -name '*.ko'))) cciss mptspi mptsas mmc_block sdhci_pci
 
 CRYPTOMODS=dm-crypt $(basename $(notdir $(shell find $(MODDIR)/kernel -name cbc.ko $(patsubst %,-or -name '%*.ko',aes sha))))
 CRYPTOPROGS=cryptsetup
@@ -41,7 +42,8 @@ FUSEMODS=fuse
 NTFSPROGS=/usr/{s,}bin/ntfs* scrounge-ntfs
 
 UDEVPROGS=udev{d,adm} /sbin/{dmsetup,blkid} $(shell find /lib/udev -maxdepth 1 -type f)
-UDEVFILES=$(shell find /lib/udev/rules.d -name "60-persistent*" -or -name "*-udev-default.rules" -or -name "*[0-9]-dm.rules" -or -name "*[0-9]-lvm.rules") $(shell find /lib/udev/keymaps -type f)
+UDEVFILES=$(shell dpkg -L udev | grep -E '^/lib/udev/rules.d/') $(shell find /lib/udev/keymaps -type f)
+#UDEVFILES=$(shell find /lib/udev/rules.d -name "60-persistent*" -or -name "*-udev-default.rules" -or -name "*[0-9]-dm.rules" -or -name "*[0-9]-lvm.rules" -or -name "*[0-9]-drivers.rules" -or -name "*[0-9]-") $(shell find /lib/udev/keymaps -type f)
 
 NETPROGS=$(wildcard /lib/libnss_dns*.so.* /lib/libnss_files*.so.*) telnet udp-{receiver,sender} {u,}mount.cifs socat
 
@@ -100,7 +102,7 @@ endif
 
 PROGS+=$(MINPROGS)
 
-ifndef MODS_PRELOAD
+ifdef MODS_PRELOAD
 MODS+=$(MODS_PRELOAD)
 endif
 
@@ -127,6 +129,10 @@ MODS+=$(NETDRV) $(EXTRAMODS)
 DATADIRS+=/usr/lib/grub /usr/share/cdebootstrap
 endif
 
+ifdef EXTRA_DATAFILES
+DATAFILES+=$(EXTRA_DATAFILES)
+endif
+
 
 # some help variables to get around makefile syntax
 empty=
@@ -151,6 +157,7 @@ test:
 	#kvm -cdrom $(ISO)
 	echo "realpath: $(realpath $(RAMDISK))"
 	echo "abspath: $(abspath $(RAMDISK))"
+	@echo "mods: $(MODS)"
 
 nfsroot:	clean
 	$(MAKE) $(MAKEFLAGS) TGT=nfsroot
