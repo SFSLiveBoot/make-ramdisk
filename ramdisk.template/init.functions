@@ -126,7 +126,7 @@ prepare_dev () {
   if test -e "$_dev";then
     local fileext="${_dev##*.}"
     if ! test -b "$_dev";then
-      modprobe loop
+      modprobe loop || true
       while ! test -e /dev/loop0; do sleep 1;done
       local loopdev=`losetup -f`
       losetup $loopdev "$_dev"
