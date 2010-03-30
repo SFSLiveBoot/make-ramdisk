@@ -4,6 +4,8 @@ RD_DIR=$(RAMDISK).d
 RD_TMPL=ramdisk.template
 RD_FILES=$(shell find $(RD_TMPL) -not -type l)
 
+findprog=$(shell find {/usr,}/{s,}bin -maxdepth 1 \( -false $(foreach name,$(1),-or -name "$(name)") \))
+
 ISO=cdrom.iso
 ISO_LABEL=Linux Live
 ISO_DIR=$(patsubst %.iso,%.d,$(ISO))
@@ -39,26 +41,26 @@ OTHERMODS=aufs squashfs
 FUSEPROGS=/sbin/mount.fuse
 FUSEMODS=fuse
 
-NTFSPROGS=/usr/{s,}bin/ntfs* scrounge-ntfs
+NTFSPROGS=$(call findprog,ntfs* scrounge-ntfs)
 
 UDEVPROGS=udev{d,adm} /sbin/{dmsetup,blkid} $(shell find /lib/udev -maxdepth 1 -type f)
 UDEVFILES=$(shell dpkg -L udev | grep -E '^/lib/udev/rules.d/') $(shell find /lib/udev/keymaps -type f)
-#UDEVFILES=$(shell find /lib/udev/rules.d -name "60-persistent*" -or -name "*-udev-default.rules" -or -name "*[0-9]-dm.rules" -or -name "*[0-9]-lvm.rules" -or -name "*[0-9]-drivers.rules" -or -name "*[0-9]-") $(shell find /lib/udev/keymaps -type f)
 
-NETPROGS=$(wildcard /lib/libnss_dns*.so.* /lib/libnss_files*.so.*) telnet udp-{receiver,sender} {u,}mount.cifs socat
+NETPROGS=$(wildcard /lib/libnss_dns*.so.* /lib/libnss_files*.so.*) $(call findprog,telnet udp-[rs]e*er *mount.cifs socat)
 
 WIFIMODS=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net/wireless -name '*.ko')))
 WIFIPROGS=iwlist iwconfig
-WIFIFILES=$(shell find /lib/firmware -type f)
 
 DISKMODS=$(DISKDRV) nls_cp437 nls_iso8859-1 nls_utf8 cdrom i2c_i801
 MODS=$(DISKMODS) $(FSMODS) $(OTHERMODS) $(USBMODS)
 NORMMODS=yenta_socket $(CRYPTOMODS)
 
 MINPROGS=modprobe /usr/lib/klibc/bin/* $(UDEVPROGS)
-NORMPROGS=rmmod halt busybox fdisk lspci lvm losetup kexec $(CRYPTOPROGS)
+NORMPROGS=rmmod halt busybox losetup $(call findprog,fdisk lspci lvm kexec) $(CRYPTOPROGS)
 
-EXTRAPROGS=halt /sbin/{fsck,mkfs.}* cfdisk hexedit less lsmod strace xfs_repair grub partimage pcimodules  hd cdebootstrap gzip objdump parted testdisk photorec /usr/{s,}bin/ntfs* ldconfig ms-sys mount mount.smbfs wlanconfig mksquashfs
+EXTRAPROGS=halt /sbin/{fsck,mkfs.}* $(call findprog,cfdisk hexedit less strace xfs_repair partimage grub hd parted cdebootstrap testdisk photorec ms-sys wlanconfig mksquashfs) lsmod pcimodules gzip objdump $(NTFSPROGS) ldconfig mount
+
+RELAXMODS=aufs ext2 ext3 ext4 sd-mod yenta_socket reiserfs
 
 DATAFILES=$(UDEVFILES)
 
@@ -154,10 +156,11 @@ mrproper: clean
 	$(RM) -r $(ISO_DIR)
 
 test:
-	#kvm -cdrom $(ISO)
-	echo "realpath: $(realpath $(RAMDISK))"
-	echo "abspath: $(abspath $(RAMDISK))"
-	@echo "mods: $(MODS)"
+	@#kvm -cdrom $(ISO)
+	@#echo "realpath: $(realpath $(RAMDISK))"
+	@#echo "abspath: $(abspath $(RAMDISK))"
+	@echo "MAKEFLAGS: $$MAKEFLAGS"
+	@#echo "mods: $(MODS)"
 
 nfsroot:	clean
 	$(MAKE) $(MAKEFLAGS) TGT=nfsroot
@@ -171,10 +174,9 @@ $(RD_DIR):	$(RD_FILES)
 	test ! -e "$(RD_DIR)/sbin/udevadm" -o -e "$(RD_DIR)/sbin/udevsettle" || ln -s udevadm "$(RD_DIR)/sbin/udevsettle"
 	test ! -e "$(RD_DIR)/usr/lib/klibc/bin/sh.shared" -o -e "$(RD_DIR)/bin/sh" || ln -s ../usr/lib/klibc/bin/sh.shared "$(RD_DIR)/bin/sh"
 	test ! -e "$(RD_DIR)/bin/sh" -o -e "$(RD_DIR)/bin/bash" || ln -s sh "$(RD_DIR)/bin/bash"
-	test ! -e "$(RD_DIR)/usr/bin/ntfs-3g" -o -e "$(RD_DIR)/sbin/mount.ntfs-3g" || ln -s ../usr/bin/ntfs-3g "$(RD_DIR)/sbin/mount.ntfs-3g"
 	test -z "$(MODS_PRELOAD)" || for mod in $(MODS_PRELOAD);do echo "$$mod" ; done > "$(RD_DIR)/etc/modules.preload"
-	./moddep $(RD_DIR) $(sort $(basename $(notdir $(MODS))))
-	echo "$(MAKEFLAGS)" >"$(RD_DIR)/.makeflags"
+	./moddep $(RD_DIR) -r "$(RELAXMODS)" $(sort $(basename $(notdir $(MODS))))
+	echo "$$MAKEFLAGS" >"$(RD_DIR)/.makeflags"
 
 $(RAMDISK): $(RD_DIR) Makefile
 	(cd "$(RD_DIR)"; find . | fakeroot cpio -L -V -o -H newc) | gzip -1 >"$(RAMDISK)"

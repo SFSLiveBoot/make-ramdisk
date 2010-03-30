@@ -3,11 +3,18 @@
 outdir="$1"
 
 if test -z "$outdir";then
-  echo "Usage: $0 outdir [modules...]"
+  echo "Usage: $0 outdir [-r \"relaxed module list ...\"] [modules...]"
+  echo " Relaxed modules don't trigger error if not found"
   exit 1
 fi
 
 shift
+
+test "x$1" != "x-r" || {
+  relaxed_modules="$2"
+  shift 2
+}
+
 
 KVERS="${KVERS:-`uname -r`}"
 MODDIR="${MODDIR:-/lib/modules/$KVERS}"
@@ -46,6 +53,9 @@ to_filenames() {
   if test -n "$names";then
     found="$(grep -E "/($(echo $names | sed -e 's/ /|/g' -e 's/[_-]/[_-]/g'))\\.ko:" "$MODDIR/modules.dep" | cut -f1 -d:)"
     not_found="$(echo $names | sed -e 's/ /\n/g' | grep -vE "($(echo $found | sed -e 's@[^ ]*/@@g' -e 's/\.ko//g' -e 's/ /|/g' -e 's/[_-]/[_-]/g'))")"
+    test -z "$not_found" || {
+      not_found="$(list_new_nondup "$relaxed_modules" $not_found)"
+    }
     test -z "$not_found" || {
       echo "ERROR: not found:" $not_found >&2
       kill -10 $$

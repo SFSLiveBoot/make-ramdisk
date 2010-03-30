@@ -284,7 +284,7 @@ chained_mount () {
      # final mount
      prepare_dev $devpath
      if test "$prepared_filesystem" = "ntfs" -a -x "$(which ntfs-3g)";then
-       ntfs-3g -o "${mntopts:-ro}" $prepared_device $mpt
+       ntfs-3g -o "${mntopts:-rw}" $prepared_device $mpt
      else
        mount -o "${mntopts:-ro}" -t $prepared_filesystem $prepared_device $mpt
      fi
