@@ -30,7 +30,7 @@ NET_DISABLED=arcnet/ phy/ appletalk/ tokenring/ wan/ wireless/ pcmcia/ hamradio/
 NETDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net -name '*.ko' $(patsubst %,-not -path '*/%*',$(NET_DISABLED))))) cifs nfs
 
 USBMODS=sd-mod usb-storage uhci-hcd ehci-hcd ohci-hcd usbhid
-DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/{ata,scsi,ide} -name '*.ko'))) cciss mptspi mptsas mmc_block sdhci_pci
+DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/{ata,scsi,ide} -name '*.ko'))) cciss mptspi mptsas mmc_block
 
 CRYPTOMODS=dm-crypt $(basename $(notdir $(shell find $(MODDIR)/kernel -name cbc.ko $(patsubst %,-or -name '%*.ko',aes sha))))
 CRYPTOPROGS=cryptsetup
@@ -60,7 +60,7 @@ NORMPROGS=rmmod halt busybox losetup $(call findprog,fdisk lspci lvm kexec) $(CR
 
 EXTRAPROGS=halt /sbin/{fsck,mkfs.}* $(call findprog,cfdisk hexedit less strace xfs_repair partimage grub hd parted cdebootstrap testdisk photorec ms-sys wlanconfig mksquashfs) lsmod pcimodules gzip objdump $(NTFSPROGS) ldconfig mount
 
-RELAXMODS=aufs ext2 ext3 ext4 sd-mod yenta_socket reiserfs
+RELAXMODS=fuse cdrom ehci-hcd loop ohci-hcd uhci-hcd aufs ext2 ext3 ext4 sd-mod yenta_socket reiserfs sdhci_pci
 
 DATAFILES=$(UDEVFILES)
 

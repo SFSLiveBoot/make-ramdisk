@@ -148,6 +148,8 @@ prepare_dev () {
           cryptkey="/keymnt/${cryptkey#*:}"
           mkdir -p /keymnt
           chained_mount "$keydev" /keymnt
+        else
+          keydev=""
         fi
         cryptsetup -d "$cryptkey" $cryptopts luksOpen "$_dev" "${_dev##*/}"
         test -z "$keydev" || umount /keymnt
