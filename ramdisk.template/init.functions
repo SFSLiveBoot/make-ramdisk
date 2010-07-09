@@ -269,7 +269,10 @@ finalize_boot () {
   enter_stage runinit
   if test -x $rr$init -a -f $rr$init;then
     log "End of ramdisk: run-init $rr $init"
-    test -n "$brk" || exec run-init $rr $init
+    test -z "$brk" || return
+    test -n "$quiet" || set -x
+    cd "$rr"
+    exec run-init -c dev/console $rr $init
   else
     echo "Refusing to run-init: '$init' on '$rr' is not executable file"
   fi

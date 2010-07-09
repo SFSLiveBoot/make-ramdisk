@@ -30,7 +30,7 @@ NET_DISABLED=arcnet/ phy/ appletalk/ tokenring/ wan/ wireless/ pcmcia/ hamradio/
 NETDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net -name '*.ko' $(patsubst %,-not -path '*/%*',$(NET_DISABLED))))) cifs nfs
 
 USBMODS=sd-mod usb-storage uhci-hcd ehci-hcd ohci-hcd usbhid
-DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/{ata,scsi,ide} -name '*.ko'))) cciss mptspi mptsas mmc_block
+DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/{ata,scsi,ide} -name '*.ko'))) cciss mptspi mptsas mmc_block sdhci_pci
 
 CRYPTOMODS=dm-crypt $(basename $(notdir $(shell find $(MODDIR)/kernel -name cbc.ko $(patsubst %,-or -name '%*.ko',aes sha))))
 CRYPTOPROGS=cryptsetup
