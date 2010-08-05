@@ -1,17 +1,16 @@
-#!/bin/sh
+#!/bin/bash
 
 outdir="$1"
 
 if test -z "$outdir";then
-  echo "Usage: $0 outdir [-r \"relaxed module list ...\"] [modules...]"
-  echo " Relaxed modules don't trigger error if not found"
+  echo "Usage: $0 outdir [-r \"missing_ok module list ...\"] [modules...]"
   exit 1
 fi
 
 shift
 
 test "x$1" != "x-r" || {
-  relaxed_modules="$2"
+  missing_ok="$2"
   shift 2
 }
 
@@ -22,21 +21,21 @@ MODDIR="${MODDIR:-/lib/modules/$KVERS}"
 trap "exit 1" 10
 
 list_new_nondup() {
-  local existing="$1" new add
+  local have_list="$1" have new_list new
   shift
-  for test1;do
-    add="$test1"
-    for test2 in $existing;do
-      if test "$test1" = "$test2";then
-        add=""
+  for new;do
+    for have in $have_list;do
+      if test "z$new" = "z$have";then
+        new=""
+        break
       fi
     done
-    if test -n "$add";then
-      new="$new${new:+ }$add"
-      existing="$existing${existing:+ }$add"
+    if test -n "$new";then
+      new_list="${new_list:+$new_list }$new"
+      have_list="${have_list:+$have_list }$new"
     fi
   done
-  echo $new
+  echo $new_list
 }
 
 get_deps() {
@@ -47,14 +46,14 @@ to_filenames() {
   local pat name n=0 found not_found names
   for name;do
     if test -z "${name#*.ko}";then echo $name;else
-      names="${names}${names:+ }$name"
+      names="${names:+$names }$name"
     fi
   done
   if test -n "$names";then
     found="$(grep -E "/($(echo $names | sed -e 's/ /|/g' -e 's/[_-]/[_-]/g'))\\.ko:" "$MODDIR/modules.dep" | cut -f1 -d:)"
     not_found="$(echo $names | sed -e 's/ /\n/g' | grep -vE "($(echo $found | sed -e 's@[^ ]*/@@g' -e 's/\.ko//g' -e 's/ /|/g' -e 's/[_-]/[_-]/g'))")"
     test -z "$not_found" || {
-      not_found="$(list_new_nondup "$relaxed_modules" $not_found)"
+      not_found="$(list_new_nondup "$missing_ok" $not_found)"
     }
     test -z "$not_found" || {
       echo "ERROR: not found:" $not_found >&2
@@ -64,7 +63,14 @@ to_filenames() {
   fi
 }
 
+add_builtin_to_missing_ok() {
+  local mod
+  for mod in $(sed -e 's@.*/@@' -e 's@.ko$@@' $MODDIR/modules.builtin);do
+    missing_ok="${missing_ok:+$missing_ok }$mod"
+  done
+}
 
+test ! -e "$MODDIR/modules.builtin" || add_builtin_to_missing_ok
 
 resolv_list="$(to_filenames $@)"
 copy_list="$resolv_list"

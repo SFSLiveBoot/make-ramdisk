@@ -1,0 +1,25 @@
+#!/bin/bash
+
+test "x$1" != "x-v" || {
+  verbose=1
+  shift
+}
+aliasfile="$1"
+
+test -e "$aliasfile" || {
+  echo "Usage: $0 [-v] <modules.alias>"
+  exit 1
+}
+
+for modalias_file in /sys/bus/*/devices/*/modalias; do
+  #echo "$modalias_file ->"
+  modalias="$(cat "$modalias_file")"
+  #echo "      $modalias"
+  test -n "$modalias" || continue
+  grep -i "^alias ${modalias%:*}" "$aliasfile" | while read aword apat modname buff;do
+    if test -z "${modalias##$apat}";then
+      echo "$modname${verbose:+ $modalias -> ($apat)}"
+      break
+    fi
+  done
+done
