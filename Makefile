@@ -58,7 +58,6 @@ NORMMODS=yenta_socket $(CRYPTOMODS)
 MINPROGS=modprobe /usr/lib/klibc/bin/* $(UDEVPROGS)
 NORMPROGS=rmmod halt busybox losetup $(call findprog,fdisk lspci lvm kexec) $(CRYPTOPROGS)
 
-EXTRAPROGS=halt /sbin/{fsck,mkfs.}* $(call findprog,cfdisk hexedit less strace xfs_repair partimage grub hd parted cdebootstrap testdisk photorec ms-sys wlanconfig mksquashfs) lsmod pcimodules gzip objdump $(NTFSPROGS) ldconfig mount
 
 RELAXMODS=fuse cdrom ehci-hcd loop ohci-hcd uhci-hcd aufs ext2 ext3 ext4 sd-mod yenta_socket reiserfs sdhci_pci
 
@@ -126,14 +125,14 @@ DATADIRS+=/usr/share/cdebootstrap
 endif
 
 ifdef EXTRA
-PROGS+=$(EXTRAPROGS) $(NETPROGS)
-MODS+=$(NETDRV) $(EXTRAMODS)
+EXTRAPROGS+=halt /sbin/{fsck,mkfs.}* $(call findprog,cfdisk hexedit less strace xfs_repair partimage grub hd parted cdebootstrap testdisk photorec ms-sys wlanconfig mksquashfs) lsmod pcimodules gzip objdump $(NTFSPROGS) ldconfig mount $(NETPROGS)
+EXTRAMODS+=$(NETDRV)
 DATADIRS+=/usr/lib/grub /usr/share/cdebootstrap
 endif
 
-ifdef EXTRA_DATAFILES
 DATAFILES+=$(EXTRA_DATAFILES)
-endif
+PROGS+=$(EXTRAPROGS)
+MODS+=$(EXTRAMODS)
 
 
 # some help variables to get around makefile syntax
