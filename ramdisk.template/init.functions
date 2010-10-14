@@ -185,7 +185,7 @@ prepare_dev () {
     if test "$_fs" = "crypto_LUKS" -o "$_fs" = "swap" && cryptsetup isLuks "$_dev";then
       modprobe dm-crypt
       if test -z "$cryptkey" ;then
-        if ! cryptsetup -t 20 $cryptopts luksOpen "$_dev" "${_dev##*/}";then
+        if ! cryptsetup -t 20 $cryptopts luksOpen "$_dev" "${_dev##*/}-dec";then
           echo -n "{$?} $_dev ck: "
           read cryptkey
         fi
@@ -199,10 +199,10 @@ prepare_dev () {
         else
           keydev=""
         fi
-        cryptsetup -d "$cryptkey" $cryptopts luksOpen "$_dev" "${_dev##*/}"
+        cryptsetup -d "$cryptkey" $cryptopts luksOpen "$_dev" "${_dev##*/}-dec"
         test -z "$keydev" || umount /keymnt
       fi
-      _dev="/dev/mapper/${_dev##*/}"
+      _dev="/dev/mapper/${_dev##*/}-dec"
       wait_exist "$_dev"
       _fs="$(fs_type $_dev)"
     fi
