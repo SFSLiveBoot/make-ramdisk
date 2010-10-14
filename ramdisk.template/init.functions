@@ -110,6 +110,54 @@ list_partitions() {
   test -z "$spc" || echo
 }
 
+prepare_file_smb() {
+  local wrk="${1#smb://}" user="" host share file mnt
+  host="${wrk%%/*}"
+  case "$host" in
+    *@*)
+      user="${host%@*}"
+      host="${host#*@}"
+    ;;
+  esac
+  wrk="${wrk#*/}"
+  share="${wrk%%/*}"
+  file="${wrk#*/}"
+  mnt="$(mktemp -d /mnt/smb-XXXXXX)"
+  test -n "$user" || { echo -n "User for //$host/$share: " >&2 ; read user ; }
+  mount.cifs "//$host/$share" "$mnt" -o "user=$user,noperm" >&2
+  echo "$mnt/$file"
+}
+
+prepare_file_tftp() {
+  local file="${1#tftp://}" dst host
+  host="${file%%/*}"
+  file="${file#*/}"
+  dst="$(mktemp /tmp/tftp-XXXXXX)"
+  tftp -g -l "$dst" -r "$file" "$host" >&2
+  echo "$dst"
+}
+
+prepare_file_wget() {
+  local dst
+  dst="$(mktemp /tmp/wget-XXXXXX)"
+  wget -O "$dst" "$1" >&2
+  echo "$dst"
+}
+
+prepare_file() {
+  case "$1" in 
+    smb://*) prepared_file="$(prepare_file_smb "$1")";;
+    tftp://*) prepared_file="$(prepare_file_tftp "$1")" ;;
+    http://*) prepared_file="$(prepare_file_wget "$1")" ;;
+    ftp://*) prepared_file="$(prepare_file_wget "$1")" ;;
+    *)
+       echo "Unknown prepare_file: '$1'" >&2
+       return 1
+    ;;
+  esac
+  echo "$prepared_file"
+}
+
 prepare_dev () {
   local _dev="$1"
   local timeout="$2"

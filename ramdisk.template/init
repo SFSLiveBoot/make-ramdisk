@@ -74,3 +74,8 @@ fi
 
 enter_stage finish
 echo "Init finished."
+test -z "$post_init" || {
+  enter_stage post_init
+  post_init_file="$(prepare_file $post_init)"
+  . "$post_init_file"
+}
