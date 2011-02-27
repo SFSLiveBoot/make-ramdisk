@@ -226,13 +226,24 @@ find_ifaces() {
   done
 }
 
+is_iface_up() {
+  local iface="$1"
+  if test -x "$(which ip)";then
+    ip link show dev "$iface" | grep -v NO-CARRIER | grep -q UP
+    return $?
+  else
+    grep -q up /sys/class/net/$iface/operstate
+    return $?
+  fi
+}
+
 wait_ifup() {
   local  ifaces="$(find_ifaces "$1")" iface="" maxwait="$iface_upwait"
   test -n "$ifaces" || return 0
-  for iface in $ifaces;do ipconfig -d :::::$iface:off; done
+  for iface in $ifaces;do ipconfig -d 169.254.1.1:::255.255.0.0::$iface:off; done
   while test "$maxwait" -gt 0;do
     for iface in $ifaces;do
-      if grep -q up /sys/class/net/$iface/operstate;then
+      if is_iface_up "$iface";then
         echo $iface
         return 0
       fi
@@ -255,11 +266,10 @@ init_net () {
     *:dhcp)
       iface="${ip%:dhcp}"
       wait_ifup "$iface"
-      ipconfig -o ${dhcp_delay:+-t $dhcp_delay} -d "$iface";;
+      ipconfig -o ${dhcp_delay:+-t $dhcp_delay} -d "$iface" ;;
     dhcp)
       wait_ifup all
-      ipconfig -o ${dhcp_delay:+-t $dhcp_delay} -d all
-    ;;
+      ipconfig -o ${dhcp_delay:+-t $dhcp_delay} -d all ;;
   esac
   for netconf in /tmp/net-*.conf;do
     . $netconf
