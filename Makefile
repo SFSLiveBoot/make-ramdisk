@@ -1,6 +1,13 @@
+KVERS=$(shell uname -r)
+MODDIR=/lib/modules/$(KVERS)
+
 SHELL=/bin/bash
-RAMDISK=ramdisk
-RD_DIR=$(RAMDISK).d
+RAMDISK=ramdisk-$(KVERS)
+ifndef RD_DIR
+  RD_DIR:=$(shell mktemp -d /tmp/ramdisk.XXXXXX)
+  export RD_DIR
+endif
+
 RD_TMPL=ramdisk.template
 RD_FILES=$(shell find $(RD_TMPL) -not -type l)
 
@@ -21,8 +28,6 @@ SFS_EXCLUDE=root/.ssh/authorized_keys etc/ssh/ssh_host_dsa_key etc/ssh/ssh_host_
 
 MKISOFS=genisoimage -r -jcharset UTF-8
 
-KVERS=$(shell uname -r)
-MODDIR=/lib/modules/$(KVERS)
 
 MODS_RUNNING=$(shell grep -v '^[^ ]* [^ ]* 0 ' /proc/modules | cut -f1 -d" " | grep -vE "^(snd|xt|nf|ipt|iptable|ip6|ip6t|ip6table)_")
 
@@ -144,9 +149,12 @@ comma=,
 BBHELP=$(shell busybox --help)
 BBFUNC=$(subst $(comma),,$(wordlist 57,$(words $(BBHELP)),$(BBHELP)))
 
-all:	$(RAMDISK)
-#	@echo "Make what - clean, $(RD_DIR)/bin, $(RD_DIR)/lib/modules, $(RAMDISK) or test?"
-#	@echo "bbfunc: $(BBFUNC)"
+.PHONY:	all ramdisk clean test nfsroot dbg
+
+all:	ramdisk
+
+ramdisk:	$(RAMDISK)
+	$(RM) -r $(RD_DIR)
 
 clean:
 	$(RM) -r $(RD_DIR) $(RAMDISK) $(ISO)
@@ -155,17 +163,14 @@ mrproper: clean
 	$(RM) -r $(ISO_DIR)
 
 test:
-	@#kvm -cdrom $(ISO)
-	@#echo "realpath: $(realpath $(RAMDISK))"
-	@#echo "abspath: $(abspath $(RAMDISK))"
-	@echo "UDEVPROGS: $(UDEVPROGS)"
-	@#echo "mods: $(MODS)"
+	echo "RD_DIR: $(RD_DIR)"
+	$(MAKE) $(MAKEFLAGS) clean
 
 nfsroot:	clean
 	$(MAKE) $(MAKEFLAGS) TGT=nfsroot
 	cp $(RAMDISK) netinstall/tftp
 
-$(RD_DIR):	$(RD_FILES)
+$(RAMDISK): $(RD_FILES) Makefile
 	cp -T -r $(RD_TMPL) $(RD_DIR)
 	./copy_exe -m $(RD_DIR) $(PROGS)
 	test -z "$(DATADIRS)" || cp --parents -r $(DATADIRS) $(RD_DIR)
@@ -176,11 +181,9 @@ $(RD_DIR):	$(RD_FILES)
 	test -z "$(MODS_PRELOAD)" || for mod in $(MODS_PRELOAD);do echo "$$mod" ; done > "$(RD_DIR)/etc/modules.preload"
 	./moddep $(RD_DIR) -r "$(RELAXMODS)" $(sort $(basename $(notdir $(MODS))))
 	echo "$$MAKEFLAGS" >"$(RD_DIR)/.makeflags"
+	(cd "$(RD_DIR)"; find . -not -name . | fakeroot cpio -L -V -o -H newc) | gzip -1 >"$(RAMDISK)"
 
-$(RAMDISK): $(RD_DIR) Makefile
-	(cd "$(RD_DIR)"; find . | fakeroot cpio -L -V -o -H newc) | gzip -1 >"$(RAMDISK)"
-
-$(ISO_DIR):	$(ISO_FILES) $(RAMDISK)
+$(ISO_DIR):	$(ISO_FILES) ramdisk
 	cp -T -r $(ISO_TMPL) $(ISO_DIR)
 	ln -sf ../../$(RAMDISK) $(ISO_DIR)/boot/ramdisk
 	ln -sf /boot/vmlinuz-$(KVERS) $(ISO_DIR)/boot/vmlinuz
