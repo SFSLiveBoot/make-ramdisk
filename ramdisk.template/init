@@ -29,10 +29,7 @@ test -z "$ip" || init_net $ip
 
 if test -n "$prepdev";then
   enter_stage prepfs
-  IFS_save="$IFS"
-  IFS=","
-  for dev in $prepdev;do
-    IFS="$IFS_save"
+  for dev in $(str_split , $prepdev);do
     prepare_dev $dev
   done
 fi
@@ -53,13 +50,9 @@ fi
 if test -n "$root" -a "$root" != "none";then
   log -n "Mounting root $root.."
 
-  IFS_save="$IFS"
-  IFS="+"
-  for rootpart in $root;do
-    IFS="$IFS_save"
+  for rootpart in $(str_split + $root);do
     mount_rootpart $rootpart
   done
-  unset IFS_save
 
   enter_stage union
   if test "$rcount" = "1";then

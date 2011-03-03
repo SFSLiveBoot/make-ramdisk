@@ -44,14 +44,11 @@ init_ramdisk () {
 }
 
 init_modprobe () {
-  local moda modalias mod IFS_save
+  local moda modalias mod
   log -n "loading drivers: $drivers"
-  IFS_save="$IFS"
-  IFS=","
-  for mod in $drivers;do
+  for mod in $(str_split , $drivers);do
     modprobe $qswitch $mod || true
   done
-  IFS="$IFS_save"
 
   if test -r /etc/modules.preload;then
     log -n "Pre-loading modules: "
@@ -158,6 +155,18 @@ prepare_file() {
   echo "$prepared_file"
 }
 
+load_loop() {
+  local major dev
+  while read major dev; do
+    if test "loop" != "$dev";then
+      loop_loaded=1
+      break
+    fi
+  done
+  test -z "$loop_loaded" || modprobe loop
+  loop_loaded=1
+}
+
 prepare_dev () {
   local _dev="$1"
   local timeout="$2"
@@ -174,7 +183,7 @@ prepare_dev () {
   if test -e "$_dev";then
     local fileext="${_dev##*.}"
     if ! test -b "$_dev";then
-      modprobe loop || true
+      test -n "$loop_loaded" || load_loop
       while ! test -e /dev/loop0; do sleep 1;done
       local loopdev=`losetup -f`
       losetup $loopdev "$_dev"
@@ -337,8 +346,7 @@ finalize_boot () {
 }
 
 chained_mount () {
-  local devpath="$1"
-  local mpt="$2"
+  local devpath="$1" local mpt="$2" lastpath_file
 
   local prepath="${devpath%%:*}"
   local lastpath="${devpath#*:}"
@@ -352,10 +360,43 @@ chained_mount () {
        mount -o "${mntopts:-ro}" -t $prepared_filesystem $prepared_device $mpt
      fi
   else
-    mkdir -p /live
-    test -z "$prepath" || chained_mount $prepath /live
-    chained_mount /live/$lastpath $mpt
+    test -z "$prepath" || {
+      test -z "$lcount" || {
+        mkdir -p /live$lcount
+        mount -o move /live /live$lcount
+      }
+      mkdir -p /live
+      chained_mount $prepath /live
+      lcount=$((${lcount:-0}+1))
+    }
+    case "$lastpath" in
+      *"*"*)
+        for lastpath_file in /live/$lastpath;do
+          chained_mount /live/$lastpath_file $mpt
+        done
+      ;;
+      *) chained_mount /live/$lastpath $mpt;;
+    esac
   fi
+}
+
+str_split() {
+  local IFS_save="$IFS" part split_chars="$1" parts="$2" spc=""
+  IFS="$split_chars"
+  for part in $parts;do
+    IFS="$IFS_save"
+    echo -n "$spc$part"
+    spc=" "
+  done
+  test -z "$spc" || echo
+}
+
+basename() {
+  local name="$1" suffix="$2"
+  while test "x$name" != "x${name%/}" -a -n "${name%/}"; do name="${name%/}";done
+  test "${#name}" = 1 || name="${name##*/}" 
+  test -z "$suffix" || name="${name%$suffix}" 
+  echo "$name"
 }
 
 mount_rootpart () {
@@ -371,9 +412,9 @@ mount_rootpart () {
   if test "$rootpart" != "${rootpart#[0-9a-z]*:/}";then #nfs pattern [0-9a-z]*:/
     nfsmount -o intr,v3,udp $rootpart $mpt
   elif test "$rootpart" = "mem";then #memory
-    mount -t tmpfs none $mpt
+    mount -t tmpfs -o mode=755 none $mpt
   elif test "${rootpart#[0-9]*[kmgKMG]}" = "";then #memory with size [0-9]*[kmgKMG]
-    mount -t tmpfs -o size=$rootpart none $mpt
+    mount -t tmpfs -o mode=755 -o size=$rootpart none $mpt
   else
     chained_mount $rootpart $mpt
   fi
@@ -408,7 +449,10 @@ run_parts() {
   local dir="$1"
   shift
   for script in "$dir"/*;do
-    test ! -x "$script" || "$script" "$@"
+    case "$script" in
+      *.sh) . "$script";;
+      *) test ! -x "$script" || "$script" "$@" ;;
+    esac
   done
 }
 
