@@ -158,12 +158,12 @@ prepare_file() {
 load_loop() {
   local major dev
   while read major dev; do
-    if test "loop" != "$dev";then
+    test "'loop'" != "'$dev'" || {
       loop_loaded=1
       break
-    fi
-  done
-  test -z "$loop_loaded" || modprobe loop
+    }
+  done < /proc/devices
+  test "1" = "$loop_loaded" || modprobe loop
   loop_loaded=1
 }
 
@@ -345,6 +345,20 @@ finalize_boot () {
   fi
 }
 
+add_chained_mpt() {
+  chained_parts="$1${chained_parts:+ $chained_parts}"
+}
+
+mount_device() {
+  local device="$1" mpt="$2"
+  prepare_dev $device
+  if test "$prepared_filesystem" = "ntfs" -a -x "$(which ntfs-3g)";then
+    ntfs-3g -o "${mntopts:-rw}" $prepared_device $mpt
+  else
+    mount -o "${mntopts:-ro}" -t $prepared_filesystem $prepared_device $mpt
+  fi
+}
+
 chained_mount () {
   local devpath="$1" local mpt="$2" lastpath_file
 
@@ -352,13 +366,14 @@ chained_mount () {
   local lastpath="${devpath#*:}"
 
   if test "$prepath" = "$devpath";then
-     # final mount
-     prepare_dev $devpath
-     if test "$prepared_filesystem" = "ntfs" -a -x "$(which ntfs-3g)";then
-       ntfs-3g -o "${mntopts:-rw}" $prepared_device $mpt
-     else
-       mount -o "${mntopts:-ro}" -t $prepared_filesystem $prepared_device $mpt
-     fi
+    if test "$devpath" = "mem";then #memory
+      mount -t tmpfs -o mode=755 none $mpt
+    elif test "${devpath#[0-9]*[kmgKMG]}" = "";then #memory with size [0-9]*[kmgKMG]
+      mount -t tmpfs -o mode=755 -o size=$devpath none $mpt
+    else
+      mount_device "$devpath" "$mpt"
+    fi
+    case "$mpt" in /parts/*) add_chained_mpt "$mpt";; esac
   else
     test -z "$prepath" || {
       test -z "$lcount" || {
@@ -371,8 +386,12 @@ chained_mount () {
     }
     case "$lastpath" in
       *"*"*)
+        local idx=0
         for lastpath_file in /live/$lastpath;do
-          chained_mount /live/$lastpath_file $mpt
+          log "Mounting $lastpath_file to ${mpt}-$idx"
+          mkdir -p "${mpt}-$idx"
+          chained_mount $lastpath_file ${mpt}-$idx
+          idx=$(($idx+1))
         done
       ;;
       *) chained_mount /live/$lastpath $mpt;;
@@ -411,36 +430,28 @@ mount_rootpart () {
 
   if test "$rootpart" != "${rootpart#[0-9a-z]*:/}";then #nfs pattern [0-9a-z]*:/
     nfsmount -o intr,v3,udp $rootpart $mpt
-  elif test "$rootpart" = "mem";then #memory
-    mount -t tmpfs -o mode=755 none $mpt
-  elif test "${rootpart#[0-9]*[kmgKMG]}" = "";then #memory with size [0-9]*[kmgKMG]
-    mount -t tmpfs -o mode=755 -o size=$rootpart none $mpt
+    add_chained_mpt "$mpt"
   else
     chained_mount $rootpart $mpt
   fi
 }
 
 union_parts () {
-  local partsdir="$1" ucount="$2" destdir="$3" partdst dirs pdir mnt_type sep
+  local parts="$1" destdir="$2" aufs_dirs="" part
   
-  while test "$ucount" != "0";do
-    pdir="$partsdir/$ucount"
-    dirs="$dirs$sep$pdir"
-    mnt_type="`get_mount_type "$pdir"`"
-    if test "$mnt_type" != "tmpfs" -a -n "$sep";then
-      dirs="$dirs=ro"
+  log "Union $parts to $destdir"
+  for part in $parts;do
+    if test -z "$aufs_dirs";then
+      mount -o remount,rw none $part
+      aufs_dirs="$part=rw"
     else
-      mount -o remount,rw none $pdir
+      aufs_dirs="$aufs_dirs:$part=rr"
     fi
-    ucount="$(($ucount-1))"
-    sep=":"
   done
-  log "Union $dirs to $destdir"
-  mount -t aufs -o dirs=$dirs aufs $destdir
-  for part in $partsdir/*;do
-    partdst="$destdir/.${partsdir#/}/${part##*/}"
-    if mkdir -p $partdst;then
-      mount -o move $part $partdst
+  mount -t aufs -o dirs=$aufs_dirs aufs $destdir
+  for part in $parts;do
+    if mkdir -p $destdir/.parts/${part##*/};then
+      mount -o move $part $destdir/.parts/${part##*/}
     fi
   done
 }

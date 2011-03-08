@@ -50,16 +50,15 @@ fi
 if test -n "$root" -a "$root" != "none";then
   log -n "Mounting root $root.."
 
+  chained_parts=""
   for rootpart in $(str_split + $root);do
     mount_rootpart $rootpart
   done
 
-  enter_stage union
-  if test "$rcount" = "1";then
-    mount -o move /parts/$rcount $rr
-  else
-    union_parts /parts $rcount $rr
-  fi
+  case "$chained_parts" in
+    *" "*) union_parts "$chained_parts" $rr ;;
+    *) mount -o move /parts/* $rr
+  esac
 
   enter_stage finalize
   test ! -x "$rr/$init" || finalize_boot
