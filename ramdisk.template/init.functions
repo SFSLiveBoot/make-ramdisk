@@ -147,6 +147,7 @@ prepare_file() {
     tftp://*) prepared_file="$(prepare_file_tftp "$1")" ;;
     http://*) prepared_file="$(prepare_file_wget "$1")" ;;
     ftp://*) prepared_file="$(prepare_file_wget "$1")" ;;
+    /*) prepared_file="$1";;
     *)
        echo "Unknown prepare_file: '$1'" >&2
        return 1
