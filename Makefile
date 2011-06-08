@@ -48,7 +48,7 @@ FUSEMODS=fuse
 
 NTFSPROGS=$(call findprog,ntfs* scrounge-ntfs)
 
-UDEVPROGS=udev{d,adm} /sbin/{dmsetup,blkid} $(shell find $$(dpkg -L udev  | grep '^/lib/udev/[^/]*$$') -maxdepth 0 -type f)
+UDEVPROGS=udev{d,adm} $(wildcard /lib/libnss_files*.so.*) /sbin/{dmsetup,blkid} $(shell find $$(dpkg -L udev  | grep '^/lib/udev/[^/]*$$') -maxdepth 0 -type f)
 UDEVFILES=$(shell dpkg -L udev | grep -E '^/lib/udev/rules.d/') $(shell find /lib/udev/keymaps -type f)
 
 NETPROGS=$(wildcard /lib/libnss_dns*.so.* /lib/libnss_files*.so.*) $(call findprog,telnet udp-[rs]e*er *mount.cifs socat)
@@ -63,6 +63,8 @@ NORMMODS=yenta_socket $(CRYPTOMODS)
 MINPROGS=modprobe /usr/lib/klibc/bin/* $(UDEVPROGS)
 NORMPROGS=rmmod halt busybox losetup $(call findprog,fdisk lspci lvm kexec) $(CRYPTOPROGS)
 
+TPM_PROGS=tcsd
+TPM_MODS=$(basename $(shell find $(MODDIR) -name "tpm*.ko"))
 
 RELAXMODS=fuse cdrom ehci-hcd loop ohci-hcd uhci-hcd aufs ext2 ext3 ext4 sd-mod yenta_socket reiserfs sdhci_pci
 
@@ -106,6 +108,11 @@ MODS+=$(NETDRV)
 FSMODS+=nfs
 endif
 
+ifdef TPM
+PROGS+=$(TPM_PROGS)
+MODS+=$(TPM_MODS)
+endif
+
 PROGS+=$(MINPROGS)
 
 ifdef MODS_PRELOAD
@@ -139,6 +146,8 @@ DATAFILES+=$(EXTRA_DATAFILES)
 PROGS+=$(EXTRAPROGS)
 MODS+=$(EXTRAMODS)
 
+KVM_APPEND=root=none quiet
+
 
 # some help variables to get around makefile syntax
 empty=
@@ -162,9 +171,9 @@ clean:
 mrproper: clean
 	$(RM) -r $(ISO_DIR)
 
-test:
-	echo "RD_DIR: $(RD_DIR)"
-	$(MAKE) $(MAKEFLAGS) clean
+test:	$(RAMDISK)
+	$(RM) -r $(RD_DIR)
+	kvm -kernel /boot/vmlinuz-$(KVERS) -initrd $(RAMDISK) -append "$(KVM_APPEND)"
 
 nfsroot:	clean
 	$(MAKE) $(MAKEFLAGS) TGT=nfsroot
@@ -179,6 +188,7 @@ $(RAMDISK): $(RD_FILES) Makefile
 	test ! -e "$(RD_DIR)/usr/lib/klibc/bin/sh.shared" -o -e "$(RD_DIR)/bin/sh" || ln -s ../usr/lib/klibc/bin/sh.shared "$(RD_DIR)/bin/sh"
 	test ! -e "$(RD_DIR)/bin/sh" -o -e "$(RD_DIR)/bin/bash" || ln -s sh "$(RD_DIR)/bin/bash"
 	test -z "$(MODS_PRELOAD)" || for mod in $(MODS_PRELOAD);do echo "$$mod" ; done > "$(RD_DIR)/etc/modules.preload"
+	grep -h -o "GROUP=[^ ]*" "$(RD_DIR)/lib/udev/rules.d"/*.rules | sed -e 's/GROUP="\([^"]*\)".*/^\1:/' | sort -u | grep -f - /etc/group | cut -f1-3 -d: | sed -e 's/$$/:/' >"$(RD_DIR)/etc/group"
 	./moddep $(RD_DIR) -r "$(RELAXMODS)" $(sort $(basename $(notdir $(MODS))))
 	echo "$$MAKEFLAGS" >"$(RD_DIR)/.makeflags"
 	(cd "$(RD_DIR)"; find . -not -name . | fakeroot cpio -L -V -o -H newc) | gzip -1 >"$(RAMDISK)"
