@@ -1,0 +1,2 @@
+engine -t dynamic -pre SO_PATH:/usr/lib/ssl/engines/engine_pkcs11.so -pre ID:pkcs11 -pre LIST_ADD:1 -pre LOAD -pre MODULE_PATH:/usr/lib/opensc-pkcs11.so
+rsautl -engine pkcs11 -decrypt -inkey 01 -keyform engine

@@ -66,6 +66,9 @@ NORMPROGS=rmmod halt busybox losetup $(call findprog,fdisk lspci lvm kexec) $(CR
 TPM_PROGS=tcsd
 TPM_MODS=$(basename $(shell find $(MODDIR) -name "tpm*.ko"))
 
+PKCS11_PROGS=$(call findprog,openssl pcscd pkcs15-tool) /usr/lib/opensc-pkcs11.so /usr/lib/ssl/engines/engine_pkcs11.so $(find /usr/lib/pcsc/drivers -name "*.so")
+PKCS11_FILES=/usr/lib/ssl/openssl.cnf /etc/opensc/opensc.conf
+
 RELAXMODS=fuse cdrom ehci-hcd loop ohci-hcd uhci-hcd aufs ext2 ext3 ext4 sd-mod yenta_socket reiserfs sdhci_pci
 
 DATAFILES=$(UDEVFILES)
@@ -111,6 +114,11 @@ endif
 ifdef TPM
 PROGS+=$(TPM_PROGS)
 MODS+=$(TPM_MODS)
+endif
+
+ifdef PKCS11
+PROGS+=$(PKCS11_PROGS)
+DATAFILES+=$(PKCS11_FILES)
 endif
 
 PROGS+=$(MINPROGS)
