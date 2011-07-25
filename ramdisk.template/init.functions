@@ -267,7 +267,7 @@ wait_ifup() {
 
 init_net () {
   log -n "net "
-  local ip="$1"
+  local ip="$1" i
   local dns netconf IPV4ADDR IPV4BROADCAST IPV4DNS0 IPV4DNS1 IPV4GATEWAY IPV4NETMASK NISDOMAIN DEVICE DNSDOMAIN iface ROOTSERVER #HOSTNAME
 
   ipconfig -d 127.0.0.1:::::lo:off
@@ -279,7 +279,14 @@ init_net () {
       ipconfig -o ${dhcp_delay:+-t $dhcp_delay} -d "$iface" ;;
     dhcp)
       wait_ifup all
-      ipconfig -o ${dhcp_delay:+-t $dhcp_delay} -d all ;;
+      echo -n "DHCP.."
+      for i in 9 8 7 6 5 4 3 2 1 FAIL;do
+        echo -n "$i "
+        if ipconfig -o ${dhcp_delay:+-t $dhcp_delay} -d all;then break;fi
+      done
+      echo
+      test "$i" != FAIL
+    ;;
   esac
   for netconf in /tmp/net-*.conf;do
     . $netconf
