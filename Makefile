@@ -32,7 +32,7 @@ MKISOFS=genisoimage -r -jcharset UTF-8
 MODS_RUNNING=$(shell grep -v '^[^ ]* [^ ]* 0 ' /proc/modules | cut -f1 -d" " | grep -vE "^(snd|xt|nf|ipt|iptable|ip6|ip6t|ip6table)_")
 
 NET_DISABLED=arcnet/ phy/ appletalk/ tokenring/ wan/ wireless/ pcmcia/ hamradio/ irda/ wlan ppp ath
-NETDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net -name '*.ko' $(patsubst %,-not -path '*/%*',$(NET_DISABLED))))) cifs nfs
+NETDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net -name '*.ko' $(patsubst %,-not -path '*/%*',$(NET_DISABLED))))) cifs nfs $(basename $(shell find $(MODDIR) -name md4.ko))
 
 USBMODS=sd-mod usb-storage uhci-hcd ehci-hcd ohci-hcd usbhid
 DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/{ata,scsi,ide} -name '*.ko'))) cciss mptspi mptsas mmc_block sdhci_pci
@@ -48,10 +48,10 @@ FUSEMODS=fuse
 
 NTFSPROGS=$(call findprog,ntfs* scrounge-ntfs)
 
-UDEVPROGS=udev{d,adm} $(wildcard /lib/libnss_files*.so.* /lib/i386-linux-gnu/libnss_files.so.*) /sbin/{dmsetup,blkid} $(shell find $$(dpkg -L udev  | grep '^/lib/udev/[^/]*$$') -maxdepth 0 -type f)
+UDEVPROGS=udev{d,adm} $(wildcard /lib/libnss_files.so.* /lib/i386-linux-gnu/libnss_files.so.*) /sbin/{dmsetup,blkid} $(shell find $$(dpkg -L udev  | grep '^/lib/udev/[^/]*$$') -maxdepth 0 -type f)
 UDEVFILES=$(shell dpkg -L udev | grep -E '^/lib/udev/rules.d/') $(shell find /lib/udev/keymaps -type f)
 
-NETPROGS=$(wildcard /lib/libnss_dns*.so.* /lib/libnss_files*.so.*) $(call findprog,telnet udp-[rs]e*er *mount.cifs socat)
+NETPROGS=$(wildcard /lib/libnss_dns.so.* /lib/libnss_files.so.* /lib/i386-linux-gnu/libnss_files.so.* /lib/i386-linux-gnu/libnss_dns.so.*) $(call findprog,telnet udp-[rs]e*er *mount.cifs socat)
 
 WIFIMODS=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net/wireless -name '*.ko')))
 WIFIPROGS=iwlist iwconfig
