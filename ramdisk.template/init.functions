@@ -33,6 +33,16 @@ init_udev () {
   log
 }
 
+init_pkcs11() {
+  mkdir -p /var/run/openct /var/run/pcscd
+  openct-control init
+}
+
+stop_pkcs11() {
+  killall pcscd || true
+  test ! -e /var/run/openct/status || openct-control shutdown
+}
+
 init_ramdisk () {
   mkdir -p /sys /proc /tmp $rr /etc/udev /var/log /mnt /parts /usr/sbin /usr/bin /sbin /dev/pts
   echo -n >>/etc/fstab
@@ -95,6 +105,10 @@ wait_exist() {
 
 fs_type() {
   blkid -o value -s TYPE "$1" || true
+}
+
+fs_uuid() {
+  blkid -o value -s UUID "$1" || true
 }
 
 list_partitions() {
@@ -172,6 +186,7 @@ prepare_dev () {
   local _dev="$1"
   local timeout="$2"
   local cryptkey="$gck"
+  local _cryptkey udev_pids
   local _l_dev
   if test -z "${_dev%@*}";then
     if _l_dev="$(blkid -L "${_dev#@}")";then
@@ -194,11 +209,14 @@ prepare_dev () {
     local _fs="$(fs_type "$_dev")"
     if test "$_fs" = "crypto_LUKS" -o "$_fs" = "swap" && cryptsetup isLuks "$_dev";then
       modprobe dm-crypt
+      udev_pids="$(getpids udevd)"
       if test -z "$cryptkey" ;then
+        killall udevd
         if ! cryptsetup -t 20 $cryptopts luksOpen "$_dev" "${_dev##*/}-dec";then
           echo -n "{$?} $_dev ck: "
           read cryptkey
         fi
+        test -z "$udev_pids" || udevd --daemon
       fi
       if test -n "$cryptkey";then
         local keydev="${cryptkey%%:*}"
@@ -206,10 +224,21 @@ prepare_dev () {
           cryptkey="/keymnt/${cryptkey#*:}"
           mkdir -p /keymnt
           chained_mount "$keydev" /keymnt
+          case "$cryptkey" in
+            *.p1)
+              init_pkcs11
+              _cryptkey="$(mktemp)"
+              decrypt_pkcs11 "$cryptkey" >"$_cryptkey"
+              cryptkey="$_cryptkey"
+              stop_pkcs11
+            ;;
+          esac
         else
           keydev=""
         fi
+        killall udevd
         cryptsetup -d "$cryptkey" $cryptopts luksOpen "$_dev" "${_dev##*/}-dec"
+        test -z "$udev_pids" || udevd --daemon
         test -z "$keydev" || umount /keymnt
       fi
       _dev="/dev/mapper/${_dev##*/}-dec"
@@ -223,6 +252,11 @@ prepare_dev () {
   else
     return 1
   fi
+}
+
+decrypt_pkcs11() {
+  local enc_file="$1" inkey="${2:-slot_01}"
+  openssl rsautl -engine pkcs11 -keyform engine -inkey $inkey -decrypt -in "$enc_file"
 }
 
 find_ifaces() {
