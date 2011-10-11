@@ -12,6 +12,7 @@ RD_TMPL=ramdisk.template
 RD_FILES=$(shell find $(RD_TMPL) -not -type l)
 
 findprog=$(shell find {/usr,}/{s,}bin -maxdepth 1 \( -false $(foreach name,$(1),-or -name "$(name)") \))
+findmod=$(basename $(notdir $(shell find $(MODDIR) \( -false $(foreach name,$(1),-or -name "$(subst -,[-_],$(name)).ko") \))))
 
 ISO=cdrom.iso
 ISO_LABEL=Linux Live
@@ -32,15 +33,15 @@ MKISOFS=genisoimage -r -jcharset UTF-8
 MODS_RUNNING=$(shell grep -v '^[^ ]* [^ ]* 0 ' /proc/modules | cut -f1 -d" " | grep -vE "^(snd|xt|nf|ipt|iptable|ip6|ip6t|ip6table)_")
 
 NET_DISABLED=arcnet/ phy/ appletalk/ tokenring/ wan/ wireless/ pcmcia/ hamradio/ irda/ wlan ppp ath
-NETDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net -name '*.ko' $(patsubst %,-not -path '*/%*',$(NET_DISABLED))))) cifs nfs $(basename $(shell find $(MODDIR) -name md4.ko))
+NETDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net -name '*.ko' $(patsubst %,-not -path '*/%*',$(NET_DISABLED))))) $(call findmod,cifs nfs md4)
 
-USBMODS=sd-mod usb-storage uhci-hcd ehci-hcd ohci-hcd usbhid
+USBMODS=$(call findmod,sd-mod usb-storage uhci-hcd ehci-hcd ohci-hcd usbhid)
 DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/{ata,scsi,ide} -name '*.ko'))) cciss mptspi mptsas mmc_block sdhci_pci
 
 CRYPTOMODS=dm-crypt $(basename $(notdir $(shell find $(MODDIR)/kernel -name cbc.ko $(patsubst %,-or -name '%*.ko',aes sha))))
 CRYPTOPROGS=cryptsetup
 
-FSMODS=ext2 ext3 ext4 xfs ntfs vfat reiserfs isofs loop
+FSMODS=$(call findmod,ext2 ext3 ext4 xfs ntfs vfat reiserfs isofs loop)
 OTHERMODS=aufs squashfs
 
 FUSEPROGS=/sbin/mount.fuse
@@ -56,7 +57,7 @@ NETPROGS=$(wildcard /lib/libnss_dns.so.* /lib/libnss_files.so.* /lib/i386-linux-
 WIFIMODS=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net/wireless -name '*.ko')))
 WIFIPROGS=iwlist iwconfig
 
-DISKMODS=$(DISKDRV) nls_cp437 nls_iso8859-1 nls_utf8 cdrom i2c_i801
+DISKMODS=$(DISKDRV) $(call findmod,nls-cp437 nls-iso8859-1 nls-utf8 cdrom i2c-i801)
 MODS=$(DISKMODS) $(FSMODS) $(OTHERMODS) $(USBMODS)
 NORMMODS=yenta_socket $(CRYPTOMODS)
 
@@ -93,6 +94,15 @@ UDEVPROGS=
 UDEVFILES=
 MIN=1
 NET=1
+endif
+
+ifdef SSH_PUBKEY
+DROPBEAR=1
+endif
+
+ifdef DROPBEAR
+NET=1
+PROGS+=dropbear
 endif
 
 ifdef NTFS
@@ -196,6 +206,8 @@ $(RAMDISK): $(RD_FILES) Makefile
 	test ! -e "$(RD_DIR)/usr/lib/klibc/bin/sh.shared" -o -e "$(RD_DIR)/bin/sh" || ln -s ../usr/lib/klibc/bin/sh.shared "$(RD_DIR)/bin/sh"
 	test ! -e "$(RD_DIR)/bin/sh" -o -e "$(RD_DIR)/bin/bash" || ln -s sh "$(RD_DIR)/bin/bash"
 	test -z "$(MODS_PRELOAD)" || for mod in $(MODS_PRELOAD);do echo "$$mod" ; done > "$(RD_DIR)/etc/modules.preload"
+	test -z "$(DROPBEAR)" || { mkdir -p $(RD_DIR)/etc/dropbear $(RD_DIR)/scripts/rootfs.d; for t in rsa dss;do dropbearkey -t $$t -f $(RD_DIR)/etc/dropbear/dropbear_$${t}_host_key;done; echo "mkdir -p /dev/pts;mount -t devpts none /dev/pts || true; dropbear -E -s" >$(RD_DIR)/scripts/rootfs.d/dropbear.sh; }
+	test -z "$(SSH_PUBKEY)" || { mkdir -p $(RD_DIR)/.ssh ; echo "$(SSH_PUBKEY)" >$(RD_DIR)/.ssh/authorized_keys ; }
 	grep -h -o "GROUP=[^ ]*" "$(RD_DIR)/lib/udev/rules.d"/*.rules | sed -e 's/GROUP="\([^"]*\)".*/^\1:/' | sort -u | grep -f - /etc/group | cut -f1-3 -d: | sed -e 's/$$/:/' >"$(RD_DIR)/etc/group"
 	./moddep $(RD_DIR) -r "$(RELAXMODS)" $(sort $(basename $(notdir $(MODS))))
 	echo "$$MAKEFLAGS" >"$(RD_DIR)/.makeflags"
