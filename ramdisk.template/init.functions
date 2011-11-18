@@ -209,14 +209,11 @@ prepare_dev () {
     local _fs="$(fs_type "$_dev")"
     if test "$_fs" = "crypto_LUKS" -o "$_fs" = "swap" && cryptsetup isLuks "$_dev";then
       modprobe dm-crypt
-      udev_pids="$(getpids udevd)"
       if test -z "$cryptkey" ;then
-        killall udevd
         if ! cryptsetup -t 20 $cryptopts luksOpen "$_dev" "${_dev##*/}-dec";then
           echo -n "{$?} $_dev ck: "
           read cryptkey
         fi
-        test -z "$udev_pids" || udevd --daemon
       fi
       if test -n "$cryptkey";then
         local keydev="${cryptkey%%:*}"
@@ -236,9 +233,7 @@ prepare_dev () {
         else
           keydev=""
         fi
-        killall udevd
         cryptsetup -d "$cryptkey" $cryptopts luksOpen "$_dev" "${_dev##*/}-dec"
-        test -z "$udev_pids" || udevd --daemon
         test -z "$keydev" || umount /keymnt
       fi
       _dev="/dev/mapper/${_dev##*/}-dec"

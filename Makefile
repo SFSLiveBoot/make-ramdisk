@@ -50,7 +50,7 @@ FUSEMODS=fuse
 NTFSPROGS=$(call findprog,ntfs* scrounge-ntfs)
 
 UDEVPROGS=udev{d,adm} $(wildcard /lib/libnss_files.so.* /lib/i386-linux-gnu/libnss_files.so.*) /sbin/{dmsetup,blkid} $(shell find $$(dpkg -L udev  | grep '^/lib/udev/[^/]*$$') -maxdepth 0 -type f)
-UDEVFILES=$(shell dpkg -L udev | grep -E '^/lib/udev/rules.d/') $(shell find /lib/udev/keymaps -type f)
+UDEVFILES=$(shell dpkg -L udev dmsetup | grep -E '^/lib/udev/rules.d/') $(shell find /lib/udev/keymaps -type f)
 
 NETPROGS=$(wildcard /lib/libnss_dns.so.* /lib/libnss_files.so.* /lib/i386-linux-gnu/libnss_files.so.* /lib/i386-linux-gnu/libnss_dns.so.*) $(call findprog,telnet udp-[rs]e*er *mount.cifs socat)
 
