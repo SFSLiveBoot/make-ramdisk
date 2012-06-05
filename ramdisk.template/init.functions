@@ -265,6 +265,12 @@ find_ifaces() {
   done
 }
 
+ip_link_up() {
+  local iface="$1"
+  if test -x "$(which ip)"; then ip link set up dev "$iface"
+  else ipconfig -d 169.254.1.1:::255.255.0.0::$iface:off;fi
+}
+
 is_iface_up() {
   local iface="$1"
   if test -x "$(which ip)";then
@@ -279,19 +285,33 @@ is_iface_up() {
 wait_ifup() {
   local  ifaces="$(find_ifaces "$1")" iface="" maxwait="$iface_upwait"
   test -n "$ifaces" || return 0
-  for iface in $ifaces;do ipconfig -d 169.254.1.1:::255.255.0.0::$iface:off; done
+  echo -n "Waiting for $ifaces to come up.." >&2
+  for iface in $ifaces;do ip_link_up "$iface" ; done
   while test "$maxwait" -gt 0;do
     for iface in $ifaces;do
       if is_iface_up "$iface";then
+        echo "Ok ($iface)" >&2
         echo $iface
         return 0
       fi
     done
     maxwait="$(($maxwait-1))"
+    echo -n " $maxwait" >&2
     sleep 1
   done
   echo "No interface ($ifaces) become up in $maxwait seconds" >&2
   return 1
+}
+
+get_dhcp_lease() {
+  local iface="$1"
+  if test -x "$(which udhcpc)";then
+    udhcpc ${dhcp_delay:+-T $dhcp_delay -t 2} -n -q ${iface:+-i $iface}
+    return $?
+  else
+    ipconfig -o ${dhcp_delay:+-t $dhcp_delay} -d ${iface:-all}
+    return $?
+  fi
 }
 
 init_net () {
@@ -305,19 +325,21 @@ init_net () {
     *:dhcp)
       iface="${ip%:dhcp}"
       wait_ifup "$iface"
+      get_dhcp_lease "$iface"
       ipconfig -o ${dhcp_delay:+-t $dhcp_delay} -d "$iface" ;;
     dhcp)
       wait_ifup all
       echo -n "DHCP.."
       for i in 9 8 7 6 5 4 3 2 1 FAIL;do
         echo -n "$i "
-        if ipconfig -o ${dhcp_delay:+-t $dhcp_delay} -d all;then break;fi
+        if get_dhcp_lease;then break;fi
       done
       echo
       test "$i" != FAIL
     ;;
   esac
   for netconf in /tmp/net-*.conf;do
+    test -e "$netconf" || continue
     . $netconf
     test -z "$DNSDOMAIN" || echo "domain $DNSDOMAIN" >>/etc/resolv.conf
     test -z "$ROOTSERVER" -o "$ROOTSERVER" = "0.0.0.0" || echo "$ROOTSERVER server" >>/etc/hosts
