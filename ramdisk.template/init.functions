@@ -50,7 +50,7 @@ init_ramdisk () {
   test -d /proc/$$ || mount -t proc none /proc 
   test -d /sys/kernel || mount -t sysfs none /sys
   echo -n '[9;0]'
-  test ! -x /bin/busybox || busybox --install -s || false
+  test ! -x /bin/busybox || /bin/busybox --install -s || false
 }
 
 init_modprobe () {
