@@ -1,4 +1,5 @@
 KVERS=$(shell uname -r)
+ARCH_LIB=$(dir $(shell ldd /bin/sh | grep "libc.so." | grep -o '/lib[^[:space:]]*'))
 MODDIR=/lib/modules/$(KVERS)
 
 SHELL=/bin/bash
@@ -49,10 +50,10 @@ FUSEMODS=fuse
 
 NTFSPROGS=$(call findprog,ntfs* scrounge-ntfs)
 
-UDEVPROGS=udev{d,adm} $(wildcard /lib/libnss_files.so.* /lib/i386-linux-gnu/libnss_files.so.*) /sbin/{dmsetup,blkid} $(shell find $$(dpkg -L udev  | grep '^/lib/udev/[^/]*$$') -maxdepth 0 -type f)
+UDEVPROGS=udev{d,adm} $(wildcard /lib/libnss_files.so.* $(ARCH_LIB)/libnss_files.so.*) /sbin/{dmsetup,blkid} $(shell find $$(dpkg -L udev  | grep '^/lib/udev/[^/]*$$') -maxdepth 0 -type f)
 UDEVFILES=$(shell dpkg -L udev dmsetup | grep -E '^/lib/udev/rules.d/') $(shell find /lib/udev/keymaps -type f)
 
-NETPROGS=$(wildcard /lib/libnss_dns.so.* /lib/libnss_files.so.* /lib/i386-linux-gnu/libnss_files.so.* /lib/i386-linux-gnu/libnss_dns.so.*) $(call findprog,telnet udp-[rs]e*er *mount.cifs socat)
+NETPROGS=$(wildcard /lib/libnss_dns.so.* /lib/libnss_files.so.* $(ARCH_LIB)/libnss_files.so.* $(ARCH_LIB)/libnss_dns.so.*) $(call findprog,telnet udp-[rs]e*er *mount.cifs socat)
 
 WIFIMODS=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net/wireless -name '*.ko')))
 WIFIPROGS=iwlist iwconfig

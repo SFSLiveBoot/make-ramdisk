@@ -1,0 +1,15 @@
+#!/bin/sh
+
+case "$1" in
+  deconfig)
+    for addr in $(ip add show dev "$interface" | grep -o 'inet [^[:space:]]' | cut -f2 -d" "); do
+      ip address del "$addr" dev "$interface"
+    done
+  ;;
+  bound)
+    ip address add $ip/$mask dev $interface
+    test -z "$dns" || echo "nameserver $dns" >/etc/resolv.conf
+    test -z "$router" || ip route add default via "$router"
+    test -z "$serverid" || grep -q 'server' /etc/hosts || echo "$serverid" >>/etc/hosts
+  ;;
+esac
