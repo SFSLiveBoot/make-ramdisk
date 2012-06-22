@@ -266,9 +266,10 @@ find_ifaces() {
 }
 
 ip_link_up() {
-  local iface="$1"
+  local iface="$1" up_addr="169.254.1.1:::255.255.0.0:"
+  if test "x$iface" = "xlo"; then up_addr="127.0.0.1::::"; fi
   if test -x "$(which ip)"; then ip link set up dev "$iface"
-  else ipconfig -d 169.254.1.1:::255.255.0.0::$iface:off;fi
+  else ipconfig -d $up_addr:$iface:off;fi
 }
 
 is_iface_up() {
@@ -319,14 +320,14 @@ init_net () {
   local ip="$1" i
   local dns netconf IPV4ADDR IPV4BROADCAST IPV4DNS0 IPV4DNS1 IPV4GATEWAY IPV4NETMASK NISDOMAIN DEVICE DNSDOMAIN iface ROOTSERVER #HOSTNAME
 
-  ipconfig -d 127.0.0.1:::::lo:off
+  ip_link_up lo
   case "$ip" in
     *:*:*:*:*:*:*) ipconfig -o ${dhcp_delay:+-t $dhcp_delay} -d $ip ;;
     *:dhcp)
       iface="${ip%:dhcp}"
       wait_ifup "$iface"
       get_dhcp_lease "$iface"
-      ipconfig -o ${dhcp_delay:+-t $dhcp_delay} -d "$iface" ;;
+    ;;
     dhcp)
       wait_ifup all
       echo -n "DHCP.."
@@ -537,7 +538,7 @@ enter_stage () {
 }
 
 init_env () {
-  local cmd cmdline var val
+  local cmd cmdline var val f
   test ! -r /cmdline || cmdlinefile=/cmdline
   read cmdline <${cmdlinefile:-/proc/cmdline}
   for cmd in $cmdline;do
@@ -550,6 +551,13 @@ init_env () {
       break=*) brk="${cmd#break=}" ;;
       break) brk="finalize" ;;
     esac
+  done
+
+  for f in /lib*/*-*/libnss_*;do
+    if test -e "$f";then
+      case "$LD_LIBRARY_PATH" in *${f%/*}*) continue;; esac
+      export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:+$LD_LIBRARY_PATH:}${f%/*}"
+    fi
   done
 }
 

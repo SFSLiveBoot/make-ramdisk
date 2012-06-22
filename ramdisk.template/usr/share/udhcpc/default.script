@@ -2,15 +2,19 @@
 
 case "$1" in
   deconfig)
-    ifconfig $interface 0.0.0.0 up
+    for addr in $(ip addr show dev "$interface" | grep -o 'inet [^[:space:]]\+' | cut -f2 -d" ");do
+      ip addr del "$addr" dev "$interface"
+    done
+    ip link set up dev $interface
   ;;
   bound)
-    ifconfig $interface $ip netmask $subnet
-    test -z "$router" || route add default gw $router $interface
+    ip addr add $ip/$mask dev $interface
+    test -z "$router" || ip route add default via $router dev $interface
     test -z "$dns" || { echo nameserver $dns >/etc/resolv.conf; }
+    test -z "$serverid" || grep -q server /etc/hosts || echo "$serverid server" >>/etc/hosts
   ;;
   *)
-    echo "Unknown args $0: $@"
-    export
+    echo "$0[$$]: Unknown args $@"
+    env
   ;;
 esac
