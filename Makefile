@@ -37,7 +37,8 @@ NET_DISABLED=arcnet/ phy/ appletalk/ tokenring/ wan/ wireless/ pcmcia/ hamradio/
 NIC_DRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net -name '*.ko' $(patsubst %,-not -path '*/%*',$(NET_DISABLED)))))
 NETDRV=$(NIC_DRV) $(call findmod,cifs nfs md4 hmac des_generic ecb)
 
-USBMODS=$(call findmod,sd-mod usb-storage uhci-hcd ehci-hcd ohci-hcd usbhid)
+USBHID_MODS=$(call findmod,uhci-hcd ehci-hcd ohci-hcd usbhid)
+USBMODS=$(USBHID_MODS) $(call findmod,sd-mod usb-storage)
 DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/{ata,scsi,ide} -name '*.ko'))) cciss mptspi mptsas mmc_block sdhci_pci
 
 CRYPTOMODS=dm-crypt $(basename $(notdir $(shell find $(MODDIR)/kernel -name cbc.ko $(patsubst %,-or -name '%*.ko',aes sha))))
@@ -81,7 +82,7 @@ MODS=$(MODS_RUNNING)
 endif
 
 ifeq ($(TGT),vmware)
-NETDRV=pcnet32
+NIC_DRV=pcnet32
 endif
 
 ifeq ($(TGT),usb)
@@ -94,6 +95,9 @@ FSMODS=
 DISKMODS=
 UDEVPROGS=
 UDEVFILES=
+NETPROGS=
+NETDRV=$(NIC_DRV) nfs
+USBMODS=$(USBHID_MODS)
 MIN=1
 NET=1
 endif

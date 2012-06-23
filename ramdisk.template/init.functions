@@ -268,18 +268,20 @@ find_ifaces() {
 ip_link_up() {
   local iface="$1" up_addr="169.254.1.1:::255.255.0.0:"
   if test "x$iface" = "xlo"; then up_addr="127.0.0.1::::"; fi
-  if test -x "$(which ip)"; then ip link set up dev "$iface"
+  if type ip >/dev/null; then ip link set up dev "$iface"
   else ipconfig -d $up_addr:$iface:off;fi
 }
 
 is_iface_up() {
   local iface="$1"
-  if test -x "$(which ip)";then
+  if type ip >dev/null;then
     ip link show dev "$iface" | grep -v NO-CARRIER | grep -q UP
     return $?
   else
-    grep -q up /sys/class/net/$iface/operstate
-    return $?
+    case "$(cat /sys/class/net/$iface/operstate)" in
+      up) return 0;;
+      *) return 1;;
+    esac
   fi
 }
 
@@ -306,7 +308,7 @@ wait_ifup() {
 
 get_dhcp_lease() {
   local iface="$1"
-  if test -x "$(which udhcpc)";then
+  if type udhcpc >/dev/null;then
     udhcpc ${dhcp_delay:+-T $dhcp_delay -t 2} -n -q ${iface:+-i $iface}
     return $?
   else
