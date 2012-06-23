@@ -18,7 +18,7 @@ log () {
 
 init_udev () {
   log -n "udev "
-  test -d /dev/.udev || mount -t tmpfs -o size=2M none /dev
+  test -d /dev/.udev || mount -t tmpfs -o mode=755,size=2M none /dev
   mkdir -p /dev/.udev/db/ /dev/.udev/queue/
   test -e /dev/null || mknod /dev/null c 1 3
   test -e /dev/console || mknod /dev/console c 5 1
@@ -178,7 +178,7 @@ load_loop() {
       break
     }
   done < /proc/devices
-  test "1" = "$loop_loaded" || modprobe loop
+  test "1" = "$loop_loaded" || modprobe loop ${max_loop:+max_loop=$max_loop}
   loop_loaded=1
 }
 
@@ -479,7 +479,7 @@ basename() {
 }
 
 mount_rootpart () {
-  local rootpart="$1"
+  local rootpart="$1" nfs_path nfs_host
   rcount=${rcount:-0}
   rcount=$(($rcount+1))
 
@@ -488,12 +488,23 @@ mount_rootpart () {
 
   log "Mount root part '$rootpart' to $mpt"
 
-  if test "$rootpart" != "${rootpart#[0-9a-z]*:/}";then #nfs pattern [0-9a-z]*:/
-    nfsmount -o intr,v3,udp $rootpart $mpt
-    add_chained_mpt "$mpt"
-  else
-    chained_mount $rootpart $mpt
-  fi
+  case "$rootpart" in
+    nfs://*.sfs)
+      mkdir -p /live
+      nfs_host="${rootpart#nfs://}"
+      nfs_path="${nfs_host#*/}"
+      nfs_path="/${nfs_path%/*}"
+      nfs_host="${nfs_host%%/*}"
+
+      nfsmount -o intr,v3,udp "$nfs_host:$nfs_path" /live
+      chained_mount ":${rootpart##*/}" "$mpt"
+    ;;
+    [0-9a-z]*:/*) 
+      nfsmount -o intr,v3,udp "$rootpart" "$mpt"
+      add_chained_mpt "$mpt"
+    ;;
+    *) chained_mount $rootpart $mpt;;
+  esac
 }
 
 union_parts () {
