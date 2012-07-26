@@ -155,12 +155,21 @@ prepare_file_wget() {
   echo "$dst"
 }
 
+prepare_file_dev() {
+  local dev_f="$1"
+  prepare_dev "${dev_f%%:*}" >&2
+  local mpt="$(mktemp -d /mnt/prep-XXXXXX)"
+  mount -o ro -t $prepared_filesystem $prepared_device $mpt
+  echo "$mpt/${dev_f#*:}"
+}
+
 prepare_file() {
   case "$1" in 
     smb://*) prepared_file="$(prepare_file_smb "$1")";;
     tftp://*) prepared_file="$(prepare_file_tftp "$1")" ;;
     http://*) prepared_file="$(prepare_file_wget "$1")" ;;
     ftp://*) prepared_file="$(prepare_file_wget "$1")" ;;
+    @*:*|/dev/*:*) prepared_file="$(prepare_file_dev "$1")" ;;
     /*) prepared_file="$1";;
     *)
        echo "Unknown prepare_file: '$1'" >&2

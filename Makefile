@@ -38,7 +38,7 @@ NIC_DRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net -name '*.k
 NETDRV=$(NIC_DRV) $(call findmod,cifs nfs md4 hmac des_generic ecb)
 
 USBHID_MODS=$(call findmod,uhci-hcd ehci-hcd ohci-hcd usbhid)
-USBMODS=$(USBHID_MODS) $(call findmod,sd-mod usb-storage)
+USBMODS=$(USBHID_MODS) $(call findmod,sd-mod usb-storage) $(notdir $(shell find $(MODDIR)/kernel/drivers/usb/{storage,host} -name "*.ko"))
 DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/{ata,scsi,ide} -name '*.ko'))) cciss mptspi mptsas mmc_block sdhci_pci
 
 CRYPTOMODS=dm-crypt $(basename $(notdir $(shell find $(MODDIR)/kernel -name cbc.ko $(patsubst %,-or -name '%*.ko',aes sha))))
