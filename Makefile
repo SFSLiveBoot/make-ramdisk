@@ -37,7 +37,7 @@ NET_DISABLED=arcnet/ phy/ appletalk/ tokenring/ wan/ wireless/ pcmcia/ hamradio/
 NIC_DRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net -name '*.ko' $(patsubst %,-not -path '*/%*',$(NET_DISABLED)))))
 NETDRV=$(NIC_DRV) $(call findmod,cifs nfs md4 hmac des_generic ecb)
 
-USBHID_MODS=$(call findmod,uhci-hcd ehci-hcd ohci-hcd usbhid)
+USBHID_MODS=$(call findmod,uhci-hcd ehci-hcd ohci-hcd usbhid hid-generic)
 USBMODS=$(USBHID_MODS) $(call findmod,sd-mod usb-storage) $(notdir $(shell find $(MODDIR)/kernel/drivers/usb/{storage,host} -name "*.ko"))
 DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/{ata,scsi,ide} -name '*.ko'))) cciss mptspi mptsas mmc_block sdhci_pci
 
