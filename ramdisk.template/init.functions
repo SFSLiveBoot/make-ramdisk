@@ -169,7 +169,7 @@ prepare_file() {
     tftp://*) prepared_file="$(prepare_file_tftp "$1")" ;;
     http://*) prepared_file="$(prepare_file_wget "$1")" ;;
     ftp://*) prepared_file="$(prepare_file_wget "$1")" ;;
-    @*:*|/dev/*:*) prepared_file="$(prepare_file_dev "$1")" ;;
+    @*:*|/dev/*:*|UUID=*:*|LABEL=*:*) prepared_file="$(prepare_file_dev "$1")" ;;
     /*) prepared_file="$1";;
     *)
        echo "Unknown prepare_file: '$1'" >&2
@@ -197,6 +197,10 @@ prepare_dev () {
   local cryptkey="$gck"
   local _cryptkey udev_pids
   local _l_dev
+  case "$_dev" in
+    LABEL=*) _dev="@${_dev#LABEL=}";;
+    UUID=*) _dev="/dev/disk/by-uuid/${_dev#UUID=}";;
+  esac
   if test -z "${_dev%@*}";then
     if _l_dev="$(blkid -L "${_dev#@}")";then
       _dev="$_l_dev"
