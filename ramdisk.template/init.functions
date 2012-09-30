@@ -538,6 +538,20 @@ union_parts () {
   done
 }
 
+mount_root() {
+  local root="$1" rootpart
+  chained_parts=""
+
+  for rootpart in $(str_split + $root);do
+    mount_rootpart $rootpart
+  done
+
+  case "$chained_parts" in
+    *" "*) union_parts "$chained_parts" $rr ;;
+    *) mount -o move /parts/* $rr
+  esac
+}
+
 run_parts() {
   local dir="$1"
   shift
