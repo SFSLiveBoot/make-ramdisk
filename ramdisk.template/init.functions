@@ -605,3 +605,13 @@ refresh_lvm() {
   rm -f /etc/lvm/cache/.cache
   lvm vgchange -a y
 }
+
+exit_trap() {
+  echo "ramdisk init($0) exits. stage=$stage${brk:+ break=$brk}."
+  test -n "$quiet" -a "$quiet" -gt "1" || { set -x ; set; }
+  if test -x /bin/busybox;then
+    exec /bin/busybox sh
+  else
+    exec /bin/sh
+  fi
+}

@@ -3,9 +3,11 @@
 export PATH=/sbin:/bin:/usr/sbin:/usr/bin
 PATH=$PATH:/usr/lib/klibc/bin
 
-trap 'test -z "$quiet" -a "$quiet" -gt "1" || { set; echo $0 exits at [$stage]${brk:+ break=$brk}.; } ; test -x /bin/busybox && exec /bin/busybox sh || exec /bin/sh' 0
+trap 'echo ramdisk init failed to initialize...; set -x ; exec /bin/busybox sh ; exec /bin/sh' 0
 
 . /init.functions
+
+trap exit_trap 0
 
 #
 # start main
