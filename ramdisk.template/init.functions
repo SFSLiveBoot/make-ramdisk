@@ -437,41 +437,45 @@ mount_device() {
 chained_mount () {
   local devpath="$1" local mpt="$2" lastpath_file
 
-  local prepath="${devpath%%:*}"
-  local lastpath="${devpath#*:}"
-
-  if test "$prepath" = "$devpath";then
-    if test "$devpath" = "mem";then #memory
-      mount -t tmpfs -o mode=755 none $mpt
-    elif test "${devpath#[0-9]*[kmgKMG]}" = "";then #memory with size [0-9]*[kmgKMG]
-      mount -t tmpfs -o mode=755 -o size=$devpath none $mpt
-    else
-      mount_device "$devpath" "$mpt"
-    fi
-    case "$mpt" in /parts/*) add_chained_mpt "$mpt";; esac
-  else
-    test -z "$prepath" || {
-      test -z "$lcount" || {
-        mkdir -p /live$lcount
-        mount -o move /live /live$lcount
+  case "$devpath" in
+    *:*)
+      local prepath="${devpath%%:*}"
+      devpath="${devpath#*:}"
+      
+      test -z "$prepath" || {
+        test -z "$lcount" || {
+          mkdir -p /live$lcount
+          mount -o move /live /live$lcount
+        }
+        mkdir -p /live
+        chained_mount $prepath /live
+        lcount=$((${lcount:-0}+1))
       }
-      mkdir -p /live
-      chained_mount $prepath /live
-      lcount=$((${lcount:-0}+1))
-    }
-    case "$lastpath" in
-      *"*"*)
-        local idx=0
-        for lastpath_file in /live/$lastpath;do
-          log "Mounting $lastpath_file to ${mpt}-$idx"
-          mkdir -p "${mpt}-$idx"
-          chained_mount $lastpath_file ${mpt}-$idx
-          idx=$(($idx+1))
-        done
+      case "$devpath" in
+        [/@]*:*|UUID=*:*) chained_mount "$devpath" "$mpt";;
+        *"*"*)
+          local idx=0 n
+          for lastpath_file in /live/$devpath;do
+            n="${lastpath_file##*/}"
+            n="${n%.[0-9a-z][0-9a-z]*}"
+            log "Mounting $lastpath_file to ${mpt}-$idx-$n"
+            mkdir -p "${mpt}-$idx-$n"
+            chained_mount $lastpath_file ${mpt}-$idx-$n
+            idx=$(($idx+1))
+          done
+        ;;
+        *) chained_mount /live/$devpath $mpt;;
+      esac
       ;;
-      *) chained_mount /live/$lastpath $mpt;;
-    esac
-  fi
+    *)
+      case "$devpath" in
+        mem) mount -t tmpfs -o mode=755 none $mpt;;
+        [0-9]*[kmgKMG]) mount -t tmpfs -o mode=755 -o size=$devpath none $mpt ;;
+        *) mount_device "$devpath" "$mpt";;
+      esac
+      case "$mpt" in /parts/*) add_chained_mpt "$mpt";; esac
+    ;;
+  esac
 }
 
 str_split() {
