@@ -589,6 +589,8 @@ init_env () {
     case "$cmd" in
       no_volid) no_volid=1 ;;
       quiet) quiet="1" qswitch="-q" ;;
+      stderr=*) exec 2>${cmd#stderr=} ;;
+      stdout=*) exec >${cmd#stdout=} ;;
       quiet=*) quiet="${cmd#quiet=}" qswitch="-q" ;;
       verbose=*|verbose) qswitch="-v" verbose="${cmd#verbose=}" ;;
       break=*) brk="${cmd#break=}" ;;
