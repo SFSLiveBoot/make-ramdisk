@@ -3,6 +3,7 @@ ARCH_LIB=$(dir $(shell ldd /bin/sh | grep "libc.so." | grep -o '/lib[^[:space:]]
 MODDIR=/lib/modules/$(KVERS)
 
 SHELL=/bin/bash
+PATH:=$(PATH):/sbin:/usr/sbin
 RAMDISK=ramdisk-$(KVERS)
 ifndef RD_DIR
   RD_DIR:=$(shell mktemp -d /tmp/ramdisk.XXXXXX)
