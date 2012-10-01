@@ -632,7 +632,7 @@ refresh_lvm() {
 
 exit_trap() {
   echo "ramdisk init($0) exits. stage=$stage${brk:+ break=$brk}."
-  test -n "$quiet" -a "$quiet" -gt "1" || { set -x ; set; }
+  test "${quiet:-0}" -gt 1 || { set -x ; set; }
   if test -x /bin/busybox;then
     exec /bin/busybox sh
   else
