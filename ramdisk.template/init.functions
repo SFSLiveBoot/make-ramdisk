@@ -443,20 +443,32 @@ chained_mount () {
       devpath="${devpath#*:}"
       
       test -z "$prepath" || {
-        test -z "$lcount" || {
-          mkdir -p /live$lcount
-          mount -o move /live /live$lcount
-        }
-        mkdir -p /live
-        chained_mount $prepath /live
-        lcount=$((${lcount:-0}+1))
+        if test "$live_is_tmpfs" = "1";then
+          devpath_src="/live/mnt/${prepath##*/}"
+          mkdir -p "$devpath_src"
+          chained_mount "$prepath" "$devpath_src"
+        else
+          devpath_src=/live
+          test -z "$lcount" || {
+            mkdir -p /live$lcount
+            mount -o move /live /live$lcount
+          }
+          mkdir -p /live
+          chained_mount $prepath /live
+          lcount=$((${lcount:-0}+1))
+        fi
       }
       case "$devpath" in
-        [/@]*:*|UUID=*:*) chained_mount "$devpath" "$mpt";;
         *"*"*)
           local idx=0 n
-          for lastpath_file in /live/$devpath;do
+          for lastpath_file in "$devpath_src"/$devpath;do
             n="${lastpath_file##*/}"
+            test -z "$live_is_tmpfs" || {
+              echo -n "Copying $n .."
+              cp "$lastpath_file" /live
+              echo "ok."
+              lastpath_file="/live/$n"
+            }
             n="${n%.[0-9a-z][0-9a-z]*}"
             log "Mounting $lastpath_file to ${mpt}-$idx-$n"
             mkdir -p "${mpt}-$idx-$n"
@@ -464,7 +476,17 @@ chained_mount () {
             idx=$(($idx+1))
           done
         ;;
-        *) chained_mount /live/$devpath $mpt;;
+        *)
+          lastpath_file="$devpath_src/$devpath"
+          test -z "$live_is_tmpfs" || {
+            n="${lastpath_file##*/}"
+            echo -n "Copying $n .."
+            cp "$lastpath_file" /live
+            echo "ok."
+            lastpath_file="/live/$n"
+          }
+          chained_mount "$lastpath_file" $mpt
+        ;;
       esac
       ;;
     *)
@@ -518,6 +540,12 @@ mount_rootpart () {
       nfsmount -o intr,v3,udp "$nfs_host:$nfs_path" /live
       chained_mount ":${rootpart##*/}" "$mpt"
     ;;
+    mem:*)
+      mkdir -p /live
+      chained_mount mem /live
+      live_is_tmpfs=1
+      chained_mount "${rootpart#mem:}" "$mpt"
+    ;;
     [0-9a-z]*:/*) 
       nfsmount -o intr,v3,udp "$rootpart" "$mpt"
       add_chained_mpt "$mpt"
@@ -547,12 +575,19 @@ union_parts () {
 }
 
 mount_root() {
-  local root="$1" rootpart
+  local root="$1" rootpart mpt
   chained_parts=""
 
   for rootpart in $(str_split + $root);do
     mount_rootpart $rootpart
   done
+  test -z "$live_is_tmpfs" || {
+    for mpt in /live/mnt/*;do
+      umount $mpt
+      rmdir $mpt
+    done
+    rmdir /live/mnt
+  }
 
   case "$chained_parts" in
     *" "*) union_parts "$chained_parts" $rr ;;
