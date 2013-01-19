@@ -74,6 +74,9 @@ TPM_MODS=$(basename $(shell find $(MODDIR) -name "tpm*.ko"))
 PKCS11_PROGS=$(call findprog,openssl pcscd pkcs15-tool ifdhandler openct-control opensc-tool) /usr/lib/opensc-pkcs11.so /usr/lib/ssl/engines/engine_pkcs11.so $(shell find /usr/lib/pcsc/drivers -name "*.so") $(shell awk '/^LIBPATH/{print $$2}' /etc/reader.conf.d/*)
 PKCS11_FILES=/etc/opensc/opensc.conf  /etc/openct.conf $(wildcard /etc/reader.conf.d/*) $(shell find /usr/lib/pcsc/drivers -type f -not -name "*.so")
 
+PKCS15_PROGS=$(call findprog,pkcs15-tool pcscd) $(shell find /usr/lib/pcsc/drivers -name "*.so*") $(shell /sbin/ldconfig -p | grep -o '/[^[:space:]]*/libpcsclite.so.1' | head -1) $(shell /sbin/ldconfig -p | grep -o '/[^[:space:]]*/libgcc_s.so.1' | head -1)
+PKCS15_FILES=$(shell find /usr/lib/pcsc/drivers -not -name "*.so*" -not -type d)
+
 MODFILES=$(shell find "$(MODDIR)" -name "modules.builtin" -o -name "modules.order")
 
 RELAXMODS=fuse cdrom ehci-hcd loop ohci-hcd uhci-hcd aufs ext2 ext3 ext4 sd-mod yenta_socket reiserfs sdhci_pci
@@ -138,6 +141,11 @@ endif
 ifdef PKCS11
 PROGS+=$(PKCS11_PROGS)
 DATAFILES+=$(PKCS11_FILES)
+endif
+
+ifdef PKCS15
+PROGS+=$(PKCS15_PROGS)
+DATAFILES+=$(PKCS15_FILES)
 endif
 
 PROGS+=$(MINPROGS)

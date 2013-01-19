@@ -156,6 +156,18 @@ prepare_file_wget() {
   echo "$dst"
 }
 
+prepare_file_pkcs15() {
+  local fname="$1" pcscd_pid temp_file="$(mktemp /tmp/pkcs15.XXXXXX)"
+  mkdir -p /var/run/pcscd
+  pcscd -x >&2
+  pkcs15-tool -w -R "$fname" -o "$temp_file" >&2 && { clear >&2 || true; }
+  test ! -e /var/run/pcscd/pcscd.pid || {
+    read pcscd_pid < /var/run/pcscd/pcscd.pid
+    test ! -e "/proc/$pcscd_pid/exe" || kill "$pcscd_pid"
+  }
+  echo "$temp_file"
+}
+
 prepare_file_dev() {
   local dev_f="$1"
   prepare_dev "${dev_f%%:*}" >&2
@@ -170,6 +182,7 @@ prepare_file() {
     tftp://*) prepared_file="$(prepare_file_tftp "$1")" ;;
     http://*) prepared_file="$(prepare_file_wget "$1")" ;;
     ftp://*) prepared_file="$(prepare_file_wget "$1")" ;;
+    pkcs15://*) prepared_file="$(prepare_file_pkcs15 "${1#pkcs15://}")" ;;
     @*:*|/dev/*:*|UUID=*:*|LABEL=*:*) prepared_file="$(prepare_file_dev "$1")" ;;
     /*) prepared_file="$1";;
     *)
@@ -230,25 +243,7 @@ prepare_dev () {
         fi
       fi
       if test -n "$cryptkey";then
-        local keydev="${cryptkey%%:*}"
-        if test "$keydev" != "$cryptkey";then
-          cryptkey="/keymnt/${cryptkey#*:}"
-          mkdir -p /keymnt
-          chained_mount "$keydev" /keymnt
-          case "$cryptkey" in
-            *.p1)
-              init_pkcs11
-              _cryptkey="$(mktemp)"
-              decrypt_pkcs11 "$cryptkey" >"$_cryptkey"
-              cryptkey="$_cryptkey"
-              stop_pkcs11
-            ;;
-          esac
-        else
-          keydev=""
-        fi
-        cryptsetup -d "$cryptkey" $cryptopts luksOpen "$_dev" "${_dev##*/}-dec"
-        test -z "$keydev" || umount /keymnt
+        cryptsetup -d "$(prepare_file "$cryptkey")" $cryptopts luksOpen "$_dev" "${_dev##*/}-dec"
       fi
       _dev="/dev/mapper/${_dev##*/}-dec"
       wait_exist "$_dev"
