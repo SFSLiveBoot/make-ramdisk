@@ -8,6 +8,7 @@ drivers="sd-mod,sr-mod,ide-disk,ide-cd,usb-storage,dm-mod,usbhid"
 dev_tmout=35
 dhcp_delay=5
 iface_upwait=10
+max_loop=64
 
 #
 # functions
