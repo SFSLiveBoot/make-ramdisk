@@ -489,6 +489,7 @@ chained_mount () {
       case "$devpath" in
         mem) mount -t tmpfs -o mode=755 none $mpt;;
         [0-9]*[kmgKMG]) mount -t tmpfs -o mode=755 -o size=$devpath none $mpt ;;
+	virt9p-*) mount -t 9p -o trans=virtio,version=9p2000.L ${devpath#virt9p-} $mpt;;
         *) mount_device "$devpath" "$mpt";;
       esac
       case "$mpt" in /parts/*) add_chained_mpt "$mpt";; esac
