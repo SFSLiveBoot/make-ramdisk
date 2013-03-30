@@ -78,7 +78,7 @@ PKCS15_PROGS=$(call findprog,pkcs15-tool pcscd) $(shell find /usr/lib/pcsc/drive
 PKCS15_FILES=$(shell find /usr/lib/pcsc/drivers -not -name "*.so*" -not -type d)
 
 MODFILES=$(shell find "$(MODDIR)" -name "modules.builtin" -o -name "modules.order")
-9P_MODS=9p 9pnet_virtio virtio_pci virtio_mmio virtio_balloon virtio_net
+9P_MODS=9p $(call findmod,9pnet_virtio virtio_pci virtio_mmio virtio_balloon virtio_net)
 
 RELAXMODS=fuse cdrom ehci-hcd loop ohci-hcd uhci-hcd aufs ext2 ext3 ext4 sd-mod yenta_socket reiserfs sdhci_pci
 
