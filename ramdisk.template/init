@@ -13,6 +13,7 @@ trap exit_trap 0
 # start main
 #
 
+enter_stage init
 init_ramdisk
 init_env
 
@@ -25,6 +26,9 @@ if test  -x /sbin/modprobe && test -e /lib/modules;then
 elif test -e /load-modules;then
   source /load-modules
 fi
+
+enter_stage wifi
+test -z "$wpa_conf" || init_wifi
 
 enter_stage netconfig
 test -z "$ip" || init_net $ip

@@ -11,6 +11,7 @@ iface_upwait=10
 max_loop=64
 arch="$(uname -m || true)"
 kver="$(uname -r || true)"
+wpa_conf="/etc/wpa.conf"
 
 #
 # functions
@@ -20,9 +21,14 @@ log () {
 }
 
 init_udev () {
+  local udev_db
   log -n "udev "
-  test -d /dev/.udev || mount -t tmpfs -o mode=755,size=2M none /dev
-  mkdir -p /dev/.udev/db/ /dev/.udev/queue/
+  if test -d /run ;then
+    test -d /run/udev || mkdir -p /run/udev
+  else
+    test -d /dev/.udev || mount -t tmpfs -o mode=755,size=2M none /dev
+    mkdir -p /dev/.udev/db/ /dev/.udev/queue/
+  fi
   test -e /dev/null || mknod /dev/null c 1 3
   test -e /dev/console || mknod /dev/console c 5 1
   test -e /dev/tty || mknod /dev/tty c 5 0
@@ -48,12 +54,34 @@ stop_pkcs11() {
 
 init_ramdisk () {
   mkdir -p /sys /proc /tmp $rr /etc/udev /var/log /mnt /parts /usr/sbin /usr/bin /sbin /dev/pts
+  test -d /run || { mkdir -p /run ; mount -t tmpfs -o nosuid,noexec,mode=0755 shmfs /run ; }
   echo -n >>/etc/fstab
   test -e /etc/mtab -o -L /etc/mtab || ln -s /proc/mounts /etc/mtab
   test -d /proc/$$ || mount -t proc none /proc 
   test -d /sys/kernel || mount -t sysfs none /sys
   echo -n '[9;0]'
   test ! -x /bin/busybox || /bin/busybox --install -s || false
+}
+
+init_wifi() {
+  local ifdir real_wpa_conf
+  which wpa_supplicant >/dev/null || return 0
+  real_wpa_conf="$(prepare_file "$wpa_conf")"
+  test -e "$real_wpa_conf" || return 0
+  test -n "$wifi_iface" || {
+    for ifdir in /sys/class/net/*;do
+      test ! -e "$ifdir/phy80211" || {
+        wifi_iface="${ifdir##*/}"
+        break
+      }
+    done
+  }
+  test -n "$wifi_iface" || {
+    echo "80211 interface not found" >&2
+    return 1
+  }
+  log "running wpa_supplicant on $wifi_iface using $real_wpa_conf"
+  wpa_supplicant -B -Dnl80211 -i"$wifi_iface" -c"$real_wpa_conf"
 }
 
 init_modprobe () {
@@ -330,7 +358,7 @@ get_dhcp_lease() {
 
 init_net () {
   log -n "net "
-  local ip="$1" i
+  local ip="$1" i iface_up
   local dns netconf IPV4ADDR IPV4BROADCAST IPV4DNS0 IPV4DNS1 IPV4GATEWAY IPV4NETMASK NISDOMAIN DEVICE DNSDOMAIN iface ROOTSERVER #HOSTNAME
 
   ip_link_up lo
@@ -342,11 +370,11 @@ init_net () {
       get_dhcp_lease "$iface"
     ;;
     dhcp)
-      wait_ifup all
+      iface_up=$(wait_ifup all)
       echo -n "DHCP.."
       for i in 9 8 7 6 5 4 3 2 1 FAIL;do
         echo -n "$i "
-        if get_dhcp_lease;then break;fi
+        if get_dhcp_lease $iface_up;then break;fi
       done
       echo
       test "$i" != FAIL
@@ -394,7 +422,7 @@ finalize_boot () {
   local migrate_list src mpt opts
   while read src mpt opts; do
     case $mpt in
-      /dev|/sys|/live*|/proc) if test -e $rr$mpt || mkdir -p $rr$mpt;then migrate_list="$mpt $migrate_list"; fi;;
+      /dev|/sys|/live*|/proc|/run) if test -e $rr$mpt || mkdir -p $rr$mpt;then migrate_list="$mpt $migrate_list"; fi;;
     esac
   done </proc/mounts
 

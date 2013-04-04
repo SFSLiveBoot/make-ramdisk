@@ -4,7 +4,7 @@ MODDIR=/lib/modules/$(KVERS)
 
 SHELL=/bin/bash
 PATH:=$(PATH):/sbin:/usr/sbin
-RAMDISK=ramdisk-$(KVERS)
+RAMDISK=ramdisk$(RAMDISK_EXTRAS)-$(KVERS)
 ifndef RD_DIR
   RD_DIR:=$(shell mktemp -d /tmp/ramdisk.XXXXXX)
   export RD_DIR
@@ -34,7 +34,10 @@ MKISOFS=genisoimage -r -jcharset UTF-8
 
 MODS_RUNNING=$(shell grep -v '^[^ ]* [^ ]* 0 ' /proc/modules | cut -f1 -d" " | grep -vE "^(snd|xt|nf|ipt|iptable|ip6|ip6t|ip6table)_")
 
-NET_DISABLED=arcnet/ phy/ appletalk/ tokenring/ wan/ wireless/ pcmcia/ hamradio/ irda/ wlan ppp ath
+NET_DISABLED_WIFI=wireless/ wlan
+NET_DISABLED_PPP=ppp
+NET_DISABLED=arcnet/ phy/ appletalk/ tokenring/ wan/ pcmcia/ hamradio/ irda/ $(NET_DISABLED_PPP) $(NET_DISABLED_WIFI)
+
 NIC_DRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net -name '*.ko' $(patsubst %,-not -path '*/%*',$(NET_DISABLED)))))
 NETDRV=$(NIC_DRV) $(call findmod,cifs nfs md4 hmac des_generic ecb arc4)
 
@@ -107,6 +110,7 @@ NETDRV=$(NIC_DRV) nfs
 USBMODS=$(USBHID_MODS)
 MIN=1
 NET=1
+RAMDISK_EXTRAS?=_nfs
 endif
 
 ifdef SSH_PUBKEY
@@ -132,10 +136,18 @@ ifdef 9P
 MODS+=$(9P_MODS)
 endif
 
+ifdef WIFI
+PROGS+=wpa_supplicant
+NET_DISABLED_WIFI=
+NET=1
+RAMDISK_EXTRAS?=_wifi
+endif
+
 ifdef NET
 PROGS+=$(NETPROGS)
 MODS+=$(NETDRV) 
 FSMODS+=nfs
+RAMDISK_EXTRAS?=_net
 endif
 
 ifdef TPM
