@@ -462,8 +462,37 @@ mount_device() {
 
 chained_mount () {
   local devpath="$1" local mpt="$2" lastpath_file
+  local uri_host uri_share uri_user uri_file
 
   case "$devpath" in
+    smb://*)
+      mkdir -p /live
+
+      uri_host="${devpath#smb://}"
+      uri_share="${uri_host#*/}"
+      uri_host="${uri_host%%/*}"
+      uri_user="${uri_host%%@*}"
+      uri_host="${uri_host#*@}"
+      uri_file="${uri_share#*:}"
+      uri_share="${uri_share%%:*}"
+      test ! "x$uri_host" = "x$uri_user" || uri_user=""
+      test ! "x$uri_file" = "x$uri_share" || uri_file=""
+
+      if test -z "$uri_file";then
+        mkdir -p "$mpt"
+        mount.cifs "//$uri_host/$uri_share" -o "noperm${uri_user:+,user=$uri_user}" "$mpt"
+      else
+        devpath_src=/live
+        test -z "$lcount" || {
+          mkdir -p /live$lcount
+          mount -o move /live /live$lcount
+        }
+        mkdir -p /live
+        lcount=$((${lcount:-0}+1))
+        mount.cifs "//$uri_host/$uri_share" -o "noperm${uri_user:+,user=$uri_user}" "$devpath_src"
+        chained_mount ":$uri_file" "$mpt"
+      fi
+    ;;
     *:*)
       local prepath="${devpath%%:*}"
       devpath="${devpath#*:}"
@@ -573,6 +602,7 @@ mount_rootpart () {
       live_is_tmpfs=1
       chained_mount "${rootpart#mem:}" "$mpt"
     ;;
+    [a-z]*://*) chained_mount "$rootpart" "$mpt" ;;
     [0-9a-z]*:/*) 
       nfsmount -o intr,v3,udp "$rootpart" "$mpt"
       add_chained_mpt "$mpt"
