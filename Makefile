@@ -1,6 +1,6 @@
 KVERS=$(shell uname -r)
 ARCH_LIB=$(dir $(shell ldd /bin/sh | grep "libc.so." | grep -o '/lib[^[:space:]]*'))
-MODDIR=/lib/modules/$(KVERS)
+MODDIR=/lib/modules/$(KVERS)/
 
 SHELL=/bin/bash
 PATH:=$(PATH):/sbin:/usr/sbin
