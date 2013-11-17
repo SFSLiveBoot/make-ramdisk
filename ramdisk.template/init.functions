@@ -662,6 +662,26 @@ union_parts () {
   done
 }
 
+prepare_aufs() {
+  local tgt="$1" src="${2:-mem}"
+  local rw="$(mktemp -d /mnt/aufs-rw.XXXXXX)"
+  chained_mount "$src" "$rw"
+  mkdir -p "$tgt"
+  mount -t aufs -o dirs="$rw=rw" aufs "$tgt"
+  mkdir -p "$tgt/.parts/rw"
+  mount -o move "$rw" "$tgt/.parts/rw"
+  rmdir "$rw"
+}
+
+insert_aufs() {
+  local tgt="$1" src="$2"
+  local src_name="${src##*/}"
+  local part_dir="$tgt/.parts/${src_name%.*}"
+  mkdir -p "$part_dir"
+  chained_mount "$src" "$part_dir"
+  mount -t aufs -o remount,ins:1:"$part_dir=rr" aufs "$tgt"
+}
+
 mount_root() {
   local root="$1" rootpart mpt
   chained_parts=""
