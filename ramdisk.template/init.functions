@@ -171,23 +171,21 @@ prepare_file_smb() {
 }
 
 prepare_file_tftp() {
-  local file="${1#tftp://}" dst host
+  local file="${1#tftp://}" dst="${2:-$(mktemp /tmp/tftp-XXXXXX)}" host
   host="${file%%/*}"
   file="${file#*/}"
-  dst="$(mktemp /tmp/tftp-XXXXXX)"
   tftp -g -l "$dst" -r "$file" "$host" >&2
   echo "$dst"
 }
 
 prepare_file_wget() {
-  local dst
-  dst="$(mktemp /tmp/wget-XXXXXX)"
+  local src="$1" dst="${2:-$(mktemp /tmp/wget-XXXXXX)}" src_comp dst_dir comp_pat
   wget -O "$dst" "$1" >&2
   echo "$dst"
 }
 
 prepare_file_pkcs15() {
-  local fname="$1" pcscd_pid temp_file="$(mktemp /tmp/pkcs15.XXXXXX)"
+  local fname="${1#pkcs15://}" pcscd_pid temp_file="${2:-$(mktemp /tmp/pkcs15.XXXXXX)}"
   mkdir -p /var/run/pcscd
   pcscd -x >&2
   pkcs15-tool -w -R "$fname" -o "$temp_file" >&2 && { clear >&2 || true; }
@@ -208,11 +206,11 @@ prepare_file_dev() {
 
 prepare_file() {
   case "$1" in 
-    smb://*) prepared_file="$(prepare_file_smb "$1")";;
-    tftp://*) prepared_file="$(prepare_file_tftp "$1")" ;;
-    http://*) prepared_file="$(prepare_file_wget "$1")" ;;
-    ftp://*) prepared_file="$(prepare_file_wget "$1")" ;;
-    pkcs15://*) prepared_file="$(prepare_file_pkcs15 "${1#pkcs15://}")" ;;
+    smb://*) prepared_file="$(prepare_file_smb "$@")";;
+    tftp://*) prepared_file="$(prepare_file_tftp "$@")" ;;
+    http://*) prepared_file="$(prepare_file_wget "$@")" ;;
+    ftp://*) prepared_file="$(prepare_file_wget "$@")" ;;
+    pkcs15://*) prepared_file="$(prepare_file_pkcs15 "$@")" ;;
     @*:*|/dev/*:*|UUID=*:*|LABEL=*:*) prepared_file="$(prepare_file_dev "$1")" ;;
     /*) prepared_file="$1";;
     *)
