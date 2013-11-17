@@ -435,7 +435,7 @@ finalize_boot () {
   log
 
   enter_stage runinit
-  if test -x $rr$init -a -f $rr$init;then
+  if test -L "$rr$init" || test -x $rr$init -a -f $rr$init;then
     log "End of ramdisk: run-init $rr $init"
     test -z "$brk" || return
     test -n "$quiet" || set -x

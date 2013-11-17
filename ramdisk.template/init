@@ -59,7 +59,7 @@ if test -n "$root" -a "$root" != "none";then
   mount_root "$root"
 
   enter_stage finalize
-  test ! -x "$rr/$init" || finalize_boot
+  test ! -x "$rr/$init" -a ! -L "$rr$init" || finalize_boot
 fi
 
 enter_stage finish
