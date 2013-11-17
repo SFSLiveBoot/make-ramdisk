@@ -182,6 +182,7 @@ prepare_file_wget() {
   local src="$1" dst="${2:-$(mktemp /tmp/wget-XXXXXX)}" src_comp dst_dir comp_pat
   local src_proto="${src%%://*}"
   local src_hostpath="${src#*://}"
+  echo -n "$src_proto://${src_hostpath%%/*}/" >/tmp/.last-dev
   case "$src" in
     *"*"*)
       dst_dir="${dst%/*}"
@@ -219,11 +220,13 @@ prepare_file_dev() {
   prepare_dev "${dev_f%%:*}" >&2
   local mpt="$(mktemp -d /mnt/prep-XXXXXX)"
   mount -o ro -t $prepared_filesystem $prepared_device $mpt
+  echo -n "$mpt/" >/tmp/.last-dev
   echo "$mpt/${dev_f#*:}"
 }
 
 prepare_file() {
   local src="$1" dst="$2"
+  case "$src" in :*) src="$(cat /tmp/.last-dev)${src#:}"; shift; set -- "$src" "$@";; esac
   case "$src" in 
     smb://*) prepared_file="$(prepare_file_smb "$@")";;
     tftp://*) prepared_file="$(prepare_file_tftp "$@")" ;;
