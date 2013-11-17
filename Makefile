@@ -225,7 +225,7 @@ mrproper: clean
 
 test:	$(RAMDISK)
 	$(RM) -r $(RD_DIR)
-	kvm -kernel /boot/vmlinuz-$(KVERS) -initrd $(RAMDISK) -append "$(KVM_APPEND)"
+	kvm -kernel /boot/vmlinuz-$(KVERS) -initrd $(RAMDISK) -append "$(KVM_APPEND)" $(KVM_OPTS)
 
 nfsroot:	clean
 	$(MAKE) $(MAKEFLAGS) TGT=nfsroot
