@@ -683,6 +683,27 @@ insert_aufs() {
 }
 
 mount_root() {
+  local src="$1" copy_up="" rw_comp="" part part_dst part_comp parts_dir
+  case "$src" in mem:*) copy_up="mem"; src="${src#mem:}";esac
+  case "$src" in *+*) rw_comp="${src##*+}"; src="${src%+*}";esac
+    case "$src" in
+    http://*)
+      enter_stage wip
+      prepare_aufs "$rr" "$rw_comp"
+      parts_dir="$rr/.parts/rw/.parts/.src"
+      mkdir -p "$parts_dir"
+      for part in $(str_split + $src);do
+        part_dst="$parts_dir/${part##*/}"
+        for part_comp in $(prepare_file "$part" "$part_dst");do
+          insert_aufs "$rr" "$part_comp"
+        done
+      done
+    ;;
+    *) mount_root_old "$@";;
+  esac
+}
+
+mount_root_old() {
   local root="$1" rootpart mpt
   chained_parts=""
 
