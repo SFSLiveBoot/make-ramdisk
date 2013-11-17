@@ -452,6 +452,7 @@ finalize_boot () {
   local migrate_list src mpt opts
   while read src mpt opts; do
     case $mpt in
+      /mnt/*) umount "$mpt" || true;; 
       /dev|/sys|/live*|/proc|/run) if test -e $rr$mpt || mkdir -p $rr$mpt;then migrate_list="$mpt $migrate_list"; fi;;
     esac
   done </proc/mounts
