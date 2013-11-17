@@ -180,8 +180,26 @@ prepare_file_tftp() {
 
 prepare_file_wget() {
   local src="$1" dst="${2:-$(mktemp /tmp/wget-XXXXXX)}" src_comp dst_dir comp_pat
-  wget -O "$dst" "$1" >&2
-  echo "$dst"
+  local src_proto="${src%%://*}"
+  local src_hostpath="${src#*://}"
+  case "$src" in
+    *"*"*)
+      dst_dir="${dst%/*}"
+      comp_pat="${src##*/}"
+      src_dir="${src%/*}"
+      for src_comp in $(wget -O - "$src_dir/" | grep -o '"[^"[:space:]]*"' | cut -f2 -d'"');do
+        case "$src_comp" in $comp_pat)
+          wget -O "$dst_dir/$src_comp" "$src_dir/$src_comp" >&2
+          echo "$dst_dir/$src_comp"
+          ;;
+        esac
+      done
+      ;;
+    *)
+      wget -O "$dst" "$1" >&2
+      echo "$dst"
+    ;;
+  esac
 }
 
 prepare_file_pkcs15() {
@@ -205,7 +223,8 @@ prepare_file_dev() {
 }
 
 prepare_file() {
-  case "$1" in 
+  local src="$1" dst="$2"
+  case "$src" in 
     smb://*) prepared_file="$(prepare_file_smb "$@")";;
     tftp://*) prepared_file="$(prepare_file_tftp "$@")" ;;
     http://*) prepared_file="$(prepare_file_wget "$@")" ;;
@@ -218,7 +237,17 @@ prepare_file() {
        return 1
     ;;
   esac
-  echo "$prepared_file"
+  if test -n "$dst" -a ! "x$dst" = "x$prepared_file";then
+    case "$dst" in
+      *"*"*) echo $prepared_file;;
+      *)
+        echo -n "Copying '$prepared_file' to '$dst'".. >&2
+        cp "$prepared_file" "$dst"
+        echo -n "ok." >&2
+        echo "$dst"
+      ;;
+    esac
+  else echo "$prepared_file";fi
 }
 
 load_loop() {
