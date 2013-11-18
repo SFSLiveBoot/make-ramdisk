@@ -682,6 +682,13 @@ insert_aufs() {
   mount -t aufs -o remount,ins:1:"$part_dir=rr" aufs "$tgt"
 }
 
+expand_vars() {
+  case "$1" in
+    *"\$"*) eval echo -n "$1" ;;
+    *) echo -n "$1";;
+  esac
+}
+
 mount_root() {
   local src="$1" copy_up="" rw_comp="" part part_dst part_comp parts_dir
   case "$src" in mem:*) copy_up="mem"; src="${src#mem:}";esac
@@ -693,6 +700,7 @@ mount_root() {
       parts_dir="$rr/.parts/rw/.parts/.src"
       mkdir -p "$parts_dir"
       for part in $(str_split + $src);do
+        part="$(expand_vars "$part")"
         part_dst="$parts_dir/${part##*/}"
         for part_comp in $(prepare_file "$part" "$part_dst");do
           insert_aufs "$rr" "$part_comp"
@@ -708,7 +716,7 @@ mount_root_old() {
   chained_parts=""
 
   for rootpart in $(str_split + $root);do
-    mount_rootpart $rootpart
+    mount_rootpart "$(expand_vars "$rootpart")"
   done
   test -z "$live_is_tmpfs" || {
     for mpt in /live/mnt/*;do
@@ -759,7 +767,7 @@ init_env () {
       verbose=*|verbose) qswitch="-v" verbose="${cmd#verbose=}" ;;
       break=*) brk="${cmd#break=}" ;;
       break) brk="finalize" ;;
-      *=*) eval "$cmd" || true;;
+      *=*) export ${cmd%%=*}="${cmd#*=}" ;;
     esac
   done
 
