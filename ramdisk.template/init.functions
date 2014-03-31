@@ -153,7 +153,8 @@ list_partitions() {
 }
 
 prepare_file_smb() {
-  local wrk="${1#smb://}" user="" host share file mnt
+  local wrk="${1#smb://}" user="" host share file
+  local mnt="${2:-$(mktemp -d /mnt/smb-XXXXXX)}"
   host="${wrk%%/*}"
   case "$host" in
     *@*)
@@ -162,95 +163,105 @@ prepare_file_smb() {
     ;;
   esac
   wrk="${wrk#*/}"
-  share="${wrk%%/*}"
+  share="${wrk%%:*}"
   file="${wrk#*/}"
-  mnt="$(mktemp -d /mnt/smb-XXXXXX)"
   test -n "$user" || { echo -n "User for //$host/$share: " >&2 ; read user ; }
   mount.cifs "//$host/$share" "$mnt" -o "user=$user,noperm" >&2
-  echo "$mnt/$file"
+  echo -n "$mnt/" >/tmp/.last-dev
+  expand_wildcards "$mnt/$file"
 }
 
 prepare_file_tftp() {
-  local file="${1#tftp://}" dst="${2:-$(mktemp /tmp/tftp-XXXXXX)}" host
+  local file="${1#tftp://}" dst="${2:-/tmp}" host
   host="${file%%/*}"
   file="${file#*/}"
-  tftp -g -l "$dst" -r "$file" "$host" >&2
-  echo "$dst"
+  tftp -g -l "$dst/${file##*/}" -r "$file" "$host" >&2
+  echo "$dst/${file##*/}"
 }
 
 prepare_file_wget() {
-  local src="$1" dst="${2:-$(mktemp /tmp/wget-XXXXXX)}" src_comp dst_dir comp_pat
+  local src="$1" dest_dir="${2:-/tmp}" src_comp comp_pat
   local src_proto="${src%%://*}"
   local src_hostpath="${src#*://}"
   echo -n "$src_proto://${src_hostpath%%/*}/" >/tmp/.last-dev
   case "$src" in
+    *.list)
+      src_dir="${src%/*}"
+      for src_comp in $(wget -O - "$src");do
+        wget -O "$dest_dir/$src_comp" "$src_dir/$src_comp" >&2
+        echo "$dest_dir/$src_comp"
+      done
+    ;;
     *"*"*)
-      dst_dir="${dst%/*}"
       comp_pat="${src##*/}"
       src_dir="${src%/*}"
       for src_comp in $(wget -O - "$src_dir/" | grep -o '"[^"[:space:]]*"' | cut -f2 -d'"');do
         case "$src_comp" in $comp_pat)
-          wget -O "$dst_dir/$src_comp" "$src_dir/$src_comp" >&2
-          echo "$dst_dir/$src_comp"
+          wget -O "$dest_dir/$src_comp" "$src_dir/$src_comp" >&2
+          echo "$dest_dir/$src_comp"
           ;;
         esac
       done
       ;;
     *)
-      wget -O "$dst" "$1" >&2
-      echo "$dst"
+      wget -O "$dest_dir/${1##*/}" "$1" >&2
+      echo "$dest_dir/${1##*/}"
     ;;
   esac
 }
 
 prepare_file_pkcs15() {
-  local fname="${1#pkcs15://}" pcscd_pid temp_file="${2:-$(mktemp /tmp/pkcs15.XXXXXX)}"
+  local fname="${1#pkcs15://}" pcscd_pid
+  local dest_dir="${2:-/tmp}"
   mkdir -p /var/run/pcscd
   pcscd -x >&2
-  pkcs15-tool -w -R "$fname" -o "$temp_file" >&2 && { clear >&2 || true; }
+  pkcs15-tool -w -R "$fname" -o "$dest_dir/${fname##*/}" >&2 && { clear >&2 || true; }
   test ! -e /var/run/pcscd/pcscd.pid || {
     read pcscd_pid < /var/run/pcscd/pcscd.pid
     test ! -e "/proc/$pcscd_pid/exe" || kill "$pcscd_pid"
   }
-  echo "$temp_file"
+  echo "$dest_dir/${fname##*/}"
+}
+
+expand_wildcards() {
+  local fname="$1" fname_match
+  case "$fname" in
+    *"*"*|*"["*"]"*)
+      for fname_match in $fname;do
+        echo "$fname_match"
+      done
+    ;;
+    *) echo "$fname";;
+  esac
 }
 
 prepare_file_dev() {
-  local dev_f="$1"
-  prepare_dev "${dev_f%%:*}" >&2
-  local mpt="$(mktemp -d /mnt/prep-XXXXXX)"
+  local dev="${1%%:*}" fname="${1#*:}"  fname_match
+  local mpt="${2:-$(mktemp -d /mnt/prep-XXXXXX)}"
+  prepare_dev "$dev" >&2
   mount -o ro -t $prepared_filesystem $prepared_device $mpt
   echo -n "$mpt/" >/tmp/.last-dev
-  echo "$mpt/${dev_f#*:}"
+  expand_wildcards "$mpt/$fname"
 }
 
 prepare_file() {
-  local src="$1" dst="$2"
-  case "$src" in :*) src="$(cat /tmp/.last-dev)${src#:}"; shift; set -- "$src" "$@";; esac
+  local src="$1" dest_dir="$2"
+  case "$src" in
+    :*) src="$(cat /tmp/.last-dev)${src#:}"; shift; set -- "$src" "$@";;
+  esac
   case "$src" in 
-    smb://*) prepared_file="$(prepare_file_smb "$@")";;
-    tftp://*) prepared_file="$(prepare_file_tftp "$@")" ;;
-    http://*) prepared_file="$(prepare_file_wget "$@")" ;;
-    ftp://*) prepared_file="$(prepare_file_wget "$@")" ;;
-    pkcs15://*) prepared_file="$(prepare_file_pkcs15 "$@")" ;;
-    @*:*|/dev/*:*|UUID=*:*|LABEL=*:*) prepared_file="$(prepare_file_dev "$1")" ;;
-    /*) prepared_file="$1";;
+    smb://*) prepare_file_smb "$@";;
+    tftp://*) prepare_file_tftp "$@" ;;
+    http://*) prepare_file_wget "$@" ;;
+    ftp://*) prepare_file_wget "$@" ;;
+    pkcs15://*) prepare_file_pkcs15 "$@" ;;
+    @*:*|/dev/*:*|UUID=*:*|LABEL=*:*) prepare_file_dev "$@" ;;
+    /*) expand_wildcards "$1";;
     *)
        echo "Unknown prepare_file: '$1'" >&2
        return 1
     ;;
   esac
-  if test -n "$dst" -a ! "x$dst" = "x$prepared_file";then
-    case "$dst" in
-      *"*"*) echo $prepared_file;;
-      *)
-        echo -n "Copying '$prepared_file' to '$dst'".. >&2
-        cp "$prepared_file" "$dst"
-        echo -n "ok." >&2
-        echo "$dst"
-      ;;
-    esac
-  else echo "$prepared_file";fi
 }
 
 load_loop() {
@@ -665,20 +676,31 @@ union_parts () {
 prepare_aufs() {
   local tgt="$1" src="${2:-mem}"
   local rw="$(mktemp -d /mnt/aufs-rw.XXXXXX)"
-  chained_mount "$src" "$rw"
+  local rw_dst="$tgt/.parts/rw"
+  mntopts=rw chained_mount "$src" "$rw" >&2
+  if touch "$rw/.write-test";then
+    rm "$rw/.write-test"
+  else
+    mount -o remount,rw "$src" "$rw"
+  fi
   mkdir -p "$tgt"
   mount -t aufs -o dirs="$rw=rw" aufs "$tgt"
-  mkdir -p "$tgt/.parts/rw"
-  mount -o move "$rw" "$tgt/.parts/rw"
+  mkdir -p "$rw_dst"
+  mount -o move "$rw" "$rw_dst"
   rmdir "$rw"
+  echo "$rw_dst"
 }
 
 insert_aufs() {
-  local tgt="$1" src="$2"
-  local src_name="${src##*/}"
-  local part_dir="$tgt/.parts/${src_name%.*}"
-  mkdir -p "$part_dir"
-  chained_mount "$src" "$part_dir"
+  local tgt="$1" src="$2" part_dir src_name
+  if test -d "$src";then
+    part_dir="$src"
+  else
+    src_name="${src##*/}"
+    part_dir="$tgt/.parts/${src_name%.*}"
+    mkdir -p "$part_dir"
+    chained_mount "$src" "$part_dir"
+  fi
   mount -t aufs -o remount,ins:1:"$part_dir=rr" aufs "$tgt"
 }
 
@@ -690,25 +712,50 @@ expand_vars() {
 }
 
 mount_root() {
-  local src="$1" copy_up="" rw_comp="" part part_dst part_comp parts_dir
+  local src="$1" copy_up="" rw_comp="" part part_dst part_comp
   case "$src" in mem:*) copy_up="mem"; src="${src#mem:}";esac
-  case "$src" in *+*) rw_comp="${src##*+}"; src="${src%+*}";esac
-    case "$src" in
-    http://*)
-      enter_stage wip
-      prepare_aufs "$rr" "$rw_comp"
-      parts_dir="$rr/.parts/rw/.parts/.src"
-      mkdir -p "$parts_dir"
-      for part in $(str_split + $src);do
-        part="$(expand_vars "$part")"
-        part_dst="$parts_dir/${part##*/}"
-        for part_comp in $(prepare_file "$part" "$part_dst");do
-          insert_aufs "$rr" "$part_comp"
-        done
-      done
+  case "$src" in
+    *+*) rw_comp="${src##*+}"; src="${src%+*}";;
+    *)
+      mkdir -p /realroot
+      chained_mount "$src" /realroot
+      return
     ;;
-    *) mount_root_old "$@";;
   esac
+  local live="$(prepare_aufs "$rr" "$rw_comp")/live"
+  mkdir -p "$live${copy_up:+/src}"
+  local live_id="$(stat -c %D "$live")"
+  for part in $(str_split + $src);do
+    part="$(expand_vars "$part")"
+    for part_comp in $(prepare_file "$part" "$live${copy_up:+/src}");do
+      test -z "$copy_up" || {
+        if test "$(stat -c %D "$part_comp")" = "$live_id";then
+          mv "$part_comp" "$live"
+        else
+          echo -n "Copying $part_comp..."
+          if test -d "$part_comp";then
+            cp -r "$part_comp"/* "$live/.."
+            part_comp=""
+          else
+            cp "$part_comp" "$live"
+          fi
+          echo "ok."
+        fi
+        test -z "$part_comp" || part_comp="$live/${part_comp##*/}"
+      }
+      test -z "$part_comp" || insert_aufs "$rr" "$part_comp"
+    done
+  done
+  test -z "$copy_up" || {
+    local live_src x y
+    grep " $live/src" /proc/mounts | tac | while read x live_src y;do
+      umount "$live_src"
+    done
+    rmdir "$live/src"
+  }
+  test "$(stat -c %D "$live")" = "$live_id" || {
+    mount -o move "$live" "$rr/live"
+  }
 }
 
 mount_root_old() {
