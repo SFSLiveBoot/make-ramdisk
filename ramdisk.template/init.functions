@@ -152,23 +152,35 @@ list_partitions() {
   test -z "$spc" || echo
 }
 
-prepare_file_smb() {
-  local wrk="${1#smb://}" user="" host share file
-  local mnt="${2:-$(mktemp -d /mnt/smb-XXXXXX)}"
-  host="${wrk%%/*}"
-  case "$host" in
-    *@*)
-      user="${host%@*}"
-      host="${host#*@}"
-    ;;
+parse_uri() {
+  local r
+  uri_schema="" uri_host="" uri_user="" uri_share="" uri_path="" uri_file=""
+  case "$1" in
+    *://*) uri_schema="${1%%://*}"; r="${1#*://}";;
+    /*) uri_schema="file" uri_path="$1" uri_file="$1"; return;;
+    *) return 1;;
   esac
-  wrk="${wrk#*/}"
-  share="${wrk%%:*}"
-  file="${wrk#*/}"
-  test -n "$user" || { echo -n "User for //$host/$share: " >&2 ; read user ; }
-  mount.cifs "//$host/$share" "$mnt" -o "user=$user,noperm" >&2
+  case "$r" in
+    *@*) uri_user="${r%%@*}"; r="${r#*@}" ;;
+  esac
+  case "$r" in
+    */*) uri_host="${r%%/*}" r="${r#*/}"; uri_path="${r:-/}" ;;
+    *) uri_host="$r"; uri_path="/"; uri_file="/"; return;;
+  esac
+  case "$r" in
+    *:*) uri_share="${r%%:*}" uri_file="${r#*:}";;
+    */*) uri_share="${r%%/*}" uri_file="${r#*/}";;
+    *) uri_file="$uri_path";;
+  esac
+}
+
+prepare_file_smb() {
+  parse_uri "$1"
+  local mnt="$2"
+  test -n "$uri_user" || { echo -n "User for //$uri_host/$uri_share: " >&2 ; read user ; }
+  mount.cifs "//$uri_host/$uri_share" "$mnt" -o "user=$uri_user,noperm" >&2
   echo -n "$mnt/" >/tmp/.last-dev
-  expand_wildcards "$mnt/$file"
+  expand_wildcards "$mnt/$uri_file"
 }
 
 prepare_file_tftp() {
