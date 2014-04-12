@@ -256,6 +256,18 @@ prepare_file_dev() {
   expand_wildcards "$mpt/$fname"
 }
 
+prepare_file_nbd() {
+  local num=0
+  parse_uri "$1"
+  test -d /sys/block/nbd$num || modprobe nbd
+  while test -e /sys/block/nbd$num/pid; do num=$(($num+1)) ;done
+  case "$uri_path" in
+   /) xnbd-client $uri_host $uri_port /dev/nbd$num >&2; echo -n "nbd://$uri_host:" >/tmp/.last-dev;;
+   *) xnbd-client --exportname "$uri_path" $uri_host $uri_port /dev/nbd$num >&2; echo -n "nbd://$uri_host:$uri_port/" >/tmp/.last-dev;;
+  esac
+  echo "/dev/nbd$num"
+}
+
 prepare_file() {
   local src="$1" dest_dir="$2"
   case "$src" in
@@ -267,6 +279,7 @@ prepare_file() {
     http://*) prepare_file_wget "$@" ;;
     ftp://*) prepare_file_wget "$@" ;;
     pkcs15://*) prepare_file_pkcs15 "$@" ;;
+    nbd://*) prepare_file_nbd "$@" ;;
     @*:*|/dev/*:*|UUID=*:*|LABEL=*:*) prepare_file_dev "$@" ;;
     /*) expand_wildcards "$1";;
     *)
