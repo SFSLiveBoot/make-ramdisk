@@ -154,7 +154,7 @@ list_partitions() {
 
 parse_uri() {
   local r
-  uri_schema="" uri_host="" uri_user="" uri_share="" uri_path="" uri_file=""
+  uri_schema="" uri_host="" uri_user="" uri_share="" uri_path="" uri_file="" uri_port=""
   case "$1" in
     *://*) uri_schema="${1%%://*}"; r="${1#*://}";;
     /*) uri_schema="file" uri_path="$1" uri_file="$1"; return;;
@@ -164,8 +164,8 @@ parse_uri() {
     *@*) uri_user="${r%%@*}"; r="${r#*@}" ;;
   esac
   case "$r" in
-    */*) uri_host="${r%%/*}" r="${r#*/}"; uri_path="${r:-/}" ;;
-    *) uri_host="$r"; uri_path="/"; uri_file="/"; return;;
+    */*) uri_host="${r%%/*}" r="${r#*/}"; case "$uri_host" in *:[0-9]*) uri_port="${uri_host##*:}"; uri_host="${uri_host%:*}";;esac; uri_path="${r:-/}" ;;
+    *) uri_host="$r"; case "$uri_host" in *:[0-9]*) uri_port="${uri_host##*:}"; uri_host="${uri_host%:*}";;esac; uri_path="/"; uri_file="/"; return;;
   esac
   case "$r" in
     *:*) uri_share="${r%%:*}" uri_file="${r#*:}";;
