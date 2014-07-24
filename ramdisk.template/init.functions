@@ -268,6 +268,14 @@ prepare_file_nbd() {
   echo "/dev/nbd$num"
 }
 
+prepare_file_virt9p() {
+  parse_uri "$1"
+  local mpt="${2:-$(mktemp -d /mnt/prep-XXXXXX)}"
+  mount -t 9p -o trans=virtio,version=9p2000.L "$uri_host" "$mpt"
+  echo -n "$mpt/" >/tmp/.last-dev
+  expand_wildcards "$mpt/$uri_path"
+}
+
 prepare_file() {
   local src="$1" dest_dir="$2"
   case "$src" in
@@ -280,6 +288,7 @@ prepare_file() {
     ftp://*) prepare_file_wget "$@" ;;
     pkcs15://*) prepare_file_pkcs15 "$@" ;;
     nbd://*) prepare_file_nbd "$@" ;;
+    virt9p://*) prepare_file_virt9p "$@" ;;
     @*:*|/dev/*:*|UUID=*:*|LABEL=*:*) prepare_file_dev "$@" ;;
     /*) expand_wildcards "$1";;
     *)
