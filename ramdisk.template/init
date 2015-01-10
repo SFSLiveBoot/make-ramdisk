@@ -40,6 +40,9 @@ if test -n "$prepdev";then
   done
 fi
 
+test -z "$sshkey" || { mkdir -p /.ssh ; echo "$sshkey" | tr _ " " >>/.ssh/authorized_keys; }
+test -z "$sshkey_file" || { mkdir -p /.ssh; cat "$(prepare_file "$sshkey_file")" >>/.ssh/authorized_keys; }
+
 enter_stage rootfs
 
 test -n "$root" || auto_root

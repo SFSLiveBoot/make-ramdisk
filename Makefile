@@ -240,7 +240,7 @@ $(RAMDISK): $(RD_FILES) Makefile
 	test ! -e "$(RD_DIR)/usr/lib/klibc/bin/sh.shared" -o -e "$(RD_DIR)/bin/sh" || ln -s ../usr/lib/klibc/bin/sh.shared "$(RD_DIR)/bin/sh"
 	test ! -e "$(RD_DIR)/bin/sh" -o -e "$(RD_DIR)/bin/bash" || ln -s sh "$(RD_DIR)/bin/bash"
 	test -z "$(MODS_PRELOAD)" || for mod in $(MODS_PRELOAD);do echo "$$mod" ; done > "$(RD_DIR)/etc/modules.preload"
-	test -z "$(DROPBEAR)" || { mkdir -p $(RD_DIR)/etc/dropbear $(RD_DIR)/scripts/rootfs.d; for t in rsa dss;do dropbearkey -t $$t -f $(RD_DIR)/etc/dropbear/dropbear_$${t}_host_key;done; echo "mkdir -p /dev/pts;mount -t devpts none /dev/pts || true; dropbear -E -s" >$(RD_DIR)/scripts/rootfs.d/dropbear.sh; }
+	test -z "$(DROPBEAR)" || { mkdir -p $(RD_DIR)/etc/dropbear $(RD_DIR)/scripts/rootfs.d; for t in rsa dss;do dropbearkey -t $$t -f $(RD_DIR)/etc/dropbear/dropbear_$${t}_host_key;done; echo "mkdir -p /dev/pts;mount -t devpts none /dev/pts || true; chmod 755 /; dropbear -E -s" >$(RD_DIR)/scripts/rootfs.d/dropbear.sh; }
 	test -z "$(SSH_PUBKEY)" || { mkdir -p $(RD_DIR)/.ssh ; echo "$(SSH_PUBKEY)" >$(RD_DIR)/.ssh/authorized_keys ; }
 	test -z "$(APPEND)" || echo "$(APPEND)" >$(RD_DIR)/cmdline
 	grep -h -o "GROUP=[^ ]*" "$(RD_DIR)/lib/udev/rules.d"/*.rules | sed -e 's/GROUP="\([^"]*\)".*/^\1:/' | sort -u | grep -f - /etc/group | cut -f1-3 -d: | sed -e 's/$$/:/' >"$(RD_DIR)/etc/group"
