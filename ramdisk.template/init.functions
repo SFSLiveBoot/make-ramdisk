@@ -102,7 +102,7 @@ init_modprobe () {
 
   enter_stage pci
   log -n " PCI"
-  for moda in /sys/bus/pci/devices/*/modalias;do
+  test ! -d /sys/bus/pci/devices || for moda in /sys/bus/pci/devices/*/modalias;do
     log -n .
     read modalias <$moda
     modprobe $qswitch $modalias || true
