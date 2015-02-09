@@ -244,7 +244,7 @@ $(RAMDISK): $(RD_FILES) Makefile
 	test -z "$(SSH_PUBKEY)" || { mkdir -p $(RD_DIR)/.ssh ; echo "$(SSH_PUBKEY)" >$(RD_DIR)/.ssh/authorized_keys ; }
 	test -z "$(APPEND)" || echo "$(APPEND)" >$(RD_DIR)/cmdline
 	grep -h -o "GROUP=[^ ]*" "$(RD_DIR)/lib/udev/rules.d"/*.rules | sed -e 's/GROUP="\([^"]*\)".*/^\1:/' | sort -u | grep -f - /etc/group | cut -f1-3 -d: | sed -e 's/$$/:/' >"$(RD_DIR)/etc/group"
-	./moddep $(RD_DIR) -r "$(RELAXMODS)" $(sort $(basename $(notdir $(MODS))))
+	env MODDIR=$(MODDIR) KVERS=$(KVERS) ./moddep $(RD_DIR) -r "$(RELAXMODS)" $(sort $(basename $(notdir $(MODS))))
 	echo "$$MAKEFLAGS" >"$(RD_DIR)/.makeflags"
 	(cd "$(RD_DIR)"; find . -not -name . | fakeroot cpio -L -V -o -H newc) | gzip -1 >"$(RAMDISK)"
 

@@ -15,10 +15,11 @@ test "x$1" != "x-r" || {
 }
 
 
-KVERS="${KVERS:-`uname -r`}"
-MODDIR="${MODDIR:-/lib/modules/$KVERS}"
+: ${KVERS:=${KVERS:-$(uname -r)}}
+: ${MODDIR:=${MODDIR:-/lib/modules/$KVERS}}
+: ${MODDIR_OUT:=$outdir/lib/modules/$KVERS}
 
-trap "exit 1" 10
+trap "exit 1" USR1
 
 list_new_nondup() {
   local have_list="$1" have new_list new
@@ -63,6 +64,17 @@ to_filenames() {
   fi
 }
 
+strip_path_prefix() {
+  local prefix="$1" without_prefix tmp
+  shift
+  for fname;do
+    without_prefix="${fname#$prefix}"
+    while test "x$without_prefix" != "x${without_prefix#/*}";do
+      without_prefix="${without_prefix#/*}"
+    done
+    echo "$without_prefix"
+  done
+}
 add_builtin_to_missing_ok() {
   local mod
   for mod in $(sed -e 's@.*/@@' -e 's@.ko$@@' $MODDIR/modules.builtin);do
@@ -84,10 +96,13 @@ test -e "$outdir" || mkdir -p "$outdir"
 for firmware in $(modinfo -F firmware $copy_list);do
   fw_file="/lib/firmware/$firmware"
   if test -e "$fw_file";then
-    copy_list="$copy_list $(list_new_nondup "$copy_list" $fw_file)"
+    fw_list="${fw_list:+$fw_list }$(list_new_nondup "$fw_list" $fw_file)"
   else
     echo "WARN: missing firmware: $firmware" >&2
   fi
 done
-cp -v --parents $copy_list "$outdir"
+
+mkdir -p "$MODDIR_OUT"
+(cd "$MODDIR"; tar c $(strip_path_prefix "$MODDIR" $copy_list)) | tar xv -C "$MODDIR_OUT"
+test -z "$fw_list" || cp -v --parents $fw_list "$outdir"
 depmod -b $outdir $KVERS
