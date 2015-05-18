@@ -198,7 +198,8 @@ DATAFILES+=$(EXTRA_DATAFILES)
 PROGS+=$(EXTRAPROGS)
 MODS+=$(EXTRAMODS)
 
-KVM_APPEND=root=none quiet
+KVM_APPEND=root=none quiet console=ttyS0
+KVM_OPTS=-nographic
 
 
 # some help variables to get around makefile syntax
