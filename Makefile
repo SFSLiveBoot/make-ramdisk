@@ -233,7 +233,7 @@ nfsroot:	clean
 
 $(RAMDISK): $(RD_FILES) Makefile
 	cp -T -r $(RD_TMPL) $(RD_DIR)
-	./copy_exe -m $(RD_DIR) $(PROGS)
+	env LANG=C ./copy_exe -m $(RD_DIR) $(PROGS)
 	test -z "$(DATADIRS)" || cp --parents -r $(DATADIRS) $(RD_DIR)
 	test -z "$(DATAFILES)" || cp --parents $(DATAFILES) $(RD_DIR)
 	test ! -e "$(RD_DIR)/sbin/udevadm" -o -e "$(RD_DIR)/sbin/udevsettle" || ln -s udevadm "$(RD_DIR)/sbin/udevsettle"
