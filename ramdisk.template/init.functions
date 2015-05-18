@@ -20,6 +20,13 @@ log () {
   test -n "$quiet" || echo "$@"
 }
 
+init_hotplug() {
+  log -n "hotplug "
+  /sbin/hotplug INITIALIZE_SYS
+  echo /sbin/hotplug >/proc/sys/kernel/hotplug
+  log
+}
+
 init_udev () {
   local udev_db
   log -n "udev "

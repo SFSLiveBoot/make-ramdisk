@@ -1,0 +1,47 @@
+#!/bin/sh
+
+set -e
+
+create_block_links() {
+  local dev="$DEVNAME" blk_info="$(mktemp)"
+  if blkid -o export -p "/dev/$DEVNAME" >"$blk_info";then
+    . "$blk_info"
+    test -z "$UUID" || test -L "/dev/disk/by-uuid/$UUID" ||
+      ln -s "../../$dev" "/dev/disk/by-uuid/$UUID" || true
+    test -z "$LABEL" || test -L "/dev/disk/by-label/$LABEL" ||
+      ln -s "../../$dev" "/dev/disk/by-label/$LABEL" || true
+  fi
+  rm "$blk_info"
+}
+
+add_dev() {
+  local node_type="c"
+  test "$subsystem" != "block" || node_type="b"
+  case "$DEVNAME" in */*) mkdir -p "/dev/${DEVNAME%/*}";;esac
+  test -e "/dev/$DEVNAME" || mknod -m ${DEVMODE:-0660} "/dev/$DEVNAME" $node_type $MAJOR $MINOR
+  case "$subsystem" in
+    block) create_block_links ;;
+  esac
+}
+
+if test "x$1" = "xINITIALIZE_SYS"; then
+  mkdir -p /dev/disk/by-uuid /dev/disk/by-label
+  for sys_dev in $(find /sys/devices -name uevent -exec grep -l DEVNAME {} +);do
+    sys_dev="${sys_dev%/uevent}"
+    unset MAJOR MINOR DEVNAME DEVMODE
+    subsystem="$(basename "$(readlink "$sys_dev/subsystem")")"
+    . "$sys_dev/uevent"
+    add_dev
+  done
+  exit
+fi
+
+subsystem="$1"
+
+case "$ACTION" in
+  add) add_dev ;;
+  change)
+    case "$subsystem" in block) create_block_links ;;esac
+  ;;
+esac
+

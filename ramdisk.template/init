@@ -18,7 +18,11 @@ init_ramdisk
 init_env
 
 enter_stage udev
-test ! -x /sbin/udevd || init_udev
+if test -x /sbin/udevd;then
+  init_udev
+else
+  init_hotplug
+fi
 
 enter_stage modprobe
 if test  -x /sbin/modprobe && test -e /lib/modules;then 
