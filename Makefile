@@ -45,7 +45,7 @@ USBHID_MODS=$(call findmod,uhci-hcd ehci-hcd ohci-hcd usbhid hid-generic)
 USBMODS=$(USBHID_MODS) $(call findmod,sd-mod usb-storage) $(notdir $(shell find $(MODDIR)/kernel/drivers/usb/{storage,host} -name "*.ko"))
 DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers \( -path "$(MODDIR)/kernel/drivers/ata/*" -o -path "$(MODDIR)/kernel/drivers/scsi/*" -o -path "$(MODDIR)/kernel/drivers/ide/*" \) -name '*.ko'))) $(call findmod,cciss mptspi mptsas mmc_block sdhci_pci virtio_blk virtio_pci loop)
 
-CRYPTOMODS=dm-crypt $(basename $(notdir $(shell find $(MODDIR)/kernel -name cbc.ko $(patsubst %,-or -name '%*.ko',aes sha))))
+CRYPTOMODS=dm-crypt $(basename $(notdir $(shell find $(MODDIR)/kernel -name cbc.ko $(patsubst %,-or -name '%*.ko',aes sha arc4 xts))))
 CRYPTOPROGS=cryptsetup
 
 FSMODS=$(call findmod,ext2 ext3 ext4 xfs ntfs vfat reiserfs isofs)
