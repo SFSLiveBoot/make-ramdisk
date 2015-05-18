@@ -56,8 +56,10 @@ FUSEMODS=fuse
 
 NTFSPROGS=$(call findprog,ntfs* scrounge-ntfs)
 
-UDEVPROGS=udev{d,adm} $(wildcard /lib/libnss_files.so.* $(ARCH_LIB)/libnss_files.so.*) /sbin/{dmsetup,blkid} $(shell find $$(dpkg -L udev  | grep '^/lib/udev/[^/]*$$') -maxdepth 0 -type f)
+ifeq ($(shell dpkg -s udev | grep -q "^Source: systemd" || echo non-systemd),non-systemd)
+UDEVPROGS=udev{d,adm} $(shell find $$(dpkg -L udev  | grep '^/lib/udev/[^/]*$$') -maxdepth 0 -type f)
 UDEVFILES=$(shell dpkg -L udev dmsetup | grep -E '^/lib/udev/rules.d/') $(shell find /lib/udev/keymaps -type f)
+endif
 
 NETPROGS=$(wildcard /lib/libnss_dns.so.* /lib/libnss_files.so.* $(ARCH_LIB)/libnss_files.so.* $(ARCH_LIB)/libnss_dns.so.*) $(call findprog,telnet udp-[rs]e*er *mount.cifs socat xnbd-client)
 
@@ -68,7 +70,7 @@ DISKMODS=$(DISKDRV) $(call findmod,nls-cp437 nls-iso8859-1 nls-utf8 cdrom i2c-i8
 MODS=$(DISKMODS) $(FSMODS) $(OTHERMODS) $(USBMODS)
 NORMMODS=yenta_socket $(CRYPTOMODS)
 
-MINPROGS=modprobe /usr/lib/klibc/bin/* $(UDEVPROGS)
+MINPROGS=modprobe /usr/lib/klibc/bin/* $(wildcard /lib/libnss_files.so.* $(ARCH_LIB)/libnss_files.so.*) /sbin/{dmsetup,blkid} $(UDEVPROGS)
 NORMPROGS=rmmod halt busybox losetup $(call findprog,fdisk lspci lvm kexec) $(CRYPTOPROGS)
 
 TPM_PROGS=tcsd
