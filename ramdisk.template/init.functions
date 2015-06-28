@@ -185,6 +185,7 @@ prepare_file_smb() {
   parse_uri "$1"
   local mnt="${2:-$(mktemp -d /mnt/smb-XXXXXX)}"
   test -n "$uri_user" || { echo -n "User for //$uri_host/$uri_share: " >&2 ; read user ; }
+  case "$uri_user" in %) uri_user=",guest" ;;esac
   mount.cifs "//$uri_host/$uri_share" "$mnt" -o "user=$uri_user,noperm" >&2
   echo -n "$mnt/" >/tmp/.last-dev
   expand_wildcards "$mnt/$uri_file"
