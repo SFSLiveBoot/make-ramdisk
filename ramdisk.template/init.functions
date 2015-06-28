@@ -244,8 +244,14 @@ prepare_file_pkcs15() {
 }
 
 expand_wildcards() {
-  local fname="$1" fname_match
+  local fname="$1" fname_match lmpt n
   case "$fname" in
+    *.lst)
+      lmpt="${fname%/*}"
+      for n in $(cat "$fname");do
+        echo "$(expand_vars "$lmpt/$n")"
+      done
+    ;;
     *"*"*|*"["*"]"*)
       for fname_match in $fname;do
         echo "$fname_match"
