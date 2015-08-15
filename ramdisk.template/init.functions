@@ -785,7 +785,8 @@ init_env () {
       verbose=*|verbose) qswitch="-v" verbose="${cmd#verbose=}" ;;
       break=*) brk="${cmd#break=}" ;;
       break) brk="finalize" ;;
-      *=*) export ${cmd%%=*}="${cmd#*=}" ;;
+      *.*=*) ;;
+      *=*) export ${cmd%%=*}="${cmd#*=}";;
     esac
   done
 
