@@ -665,62 +665,6 @@ basename() {
   echo "$name"
 }
 
-mount_rootpart () {
-  local rootpart="$1" nfs_path nfs_host
-  rcount=${rcount:-0}
-  rcount=$(($rcount+1))
-
-  local mpt=/parts/$rcount
-  mkdir -p $mpt
-
-  log "Mount root part '$rootpart' to $mpt"
-
-  case "$rootpart" in
-    nfs://*.sfs)
-      mkdir -p /live
-      nfs_host="${rootpart#nfs://}"
-      nfs_path="${nfs_host#*/}"
-      nfs_path="/${nfs_path%/*}"
-      nfs_host="${nfs_host%%/*}"
-
-      nfsmount -o intr,v3,udp "$nfs_host:$nfs_path" /live
-      chained_mount ":${rootpart##*/}" "$mpt"
-    ;;
-    mem:*)
-      mkdir -p /live
-      chained_mount mem /live
-      live_is_tmpfs=1
-      chained_mount "${rootpart#mem:}" "$mpt"
-    ;;
-    [a-z]*://*) chained_mount "$rootpart" "$mpt" ;;
-    [0-9a-z]*:/*) 
-      nfsmount -o intr,v3,udp "$rootpart" "$mpt"
-      add_chained_mpt "$mpt"
-    ;;
-    *) chained_mount $rootpart $mpt;;
-  esac
-}
-
-union_parts () {
-  local parts="$1" destdir="$2" aufs_dirs="" part
-  
-  log "Union $parts to $destdir"
-  for part in $parts;do
-    if test -z "$aufs_dirs";then
-      mount -o remount,rw none $part
-      aufs_dirs="$part=rw"
-    else
-      aufs_dirs="$aufs_dirs:$part=rr"
-    fi
-  done
-  mount -t aufs -o dirs=$aufs_dirs aufs $destdir
-  for part in $parts;do
-    if mkdir -p $destdir/.parts/${part##*/};then
-      mount -o move $part $destdir/.parts/${part##*/}
-    fi
-  done
-}
-
 prepare_aufs() {
   local tgt="$1" src="${2:-mem}"
   local rw="$(mktemp -d /mnt/aufs-rw.XXXXXX)"
@@ -804,27 +748,6 @@ mount_root() {
   test "$(stat -c %D "$live")" = "$live_id" || {
     mount -o move "$live" "$rr/live"
   }
-}
-
-mount_root_old() {
-  local root="$1" rootpart mpt
-  chained_parts=""
-
-  for rootpart in $(str_split + $root);do
-    mount_rootpart "$(expand_vars "$rootpart")"
-  done
-  test -z "$live_is_tmpfs" || {
-    for mpt in /live/mnt/*;do
-      umount $mpt
-      rmdir $mpt
-    done
-    rmdir /live/mnt
-  }
-
-  case "$chained_parts" in
-    *" "*) union_parts "$chained_parts" $rr ;;
-    *) mount -o move /parts/* $rr
-  esac
 }
 
 run_parts() {
