@@ -727,6 +727,32 @@ expand_vars() {
   esac
 }
 
+copy_part() {
+  local live="$1" part_comp="$2"
+  echo -n "Copying $part_comp .. " >&2
+  if test "$(stat -c %D "$part_comp")" = "$(stat -c %D "$live")";then
+    mv "$part_comp" "$live" >&2
+  else
+    if test -d "$part_comp";then
+      cp -r "$part_comp"/* "$live/.." >&2
+      part_comp=""
+    else
+      cp "$part_comp" "$live" >&2
+    fi
+  fi
+  echo "ok." >&2
+  test -z "$part_comp" || part_comp="$live/${part_comp##*/}"
+  echo "$part_comp"
+}
+
+cleanup_mnt() {
+  local mnt="$1" x y mpt
+  grep " $mnt" /proc/mounts | tac | while read x mpt y;do
+    umount "$mpt"
+    rmdir "$mpt"
+  done
+}
+
 mount_root() {
   local src="$1" copy_up="" rw_comp="" part part_dst part_comp live live_id
   case "$src" in mem:*) copy_up="mem"; src="${src#mem:}";esac
@@ -745,35 +771,13 @@ mount_root() {
   for part in $(str_split + $src);do
     part="$(expand_vars "$part")"
     for part_comp in $(prepare_file "$part" "$live${copy_up:+/src}");do
-      test -z "$copy_up" || {
-        if test "$(stat -c %D "$part_comp")" = "$live_id";then
-          mv "$part_comp" "$live"
-        else
-          echo -n "Copying $part_comp..."
-          if test -d "$part_comp";then
-            cp -r "$part_comp"/* "$live/.."
-            part_comp=""
-          else
-            cp "$part_comp" "$live"
-          fi
-          echo "ok."
-        fi
-        test -z "$part_comp" || part_comp="$live/${part_comp##*/}"
-      }
+      test -z "$copy_up" || part_comp="$(copy_part "$live" "$part_comp")"
       test -z "$part_comp" || insert_root "$rr" "$part_comp"
     done
   done
   finalize_root "$rr"
-  test -z "$copy_up" || {
-    local live_src x y
-    grep " $live/src" /proc/mounts | tac | while read x live_src y;do
-      umount "$live_src"
-    done
-    rmdir "$live/src"
-  }
-  test "$(stat -c %D "$live")" = "$live_id" || {
-    mount -o move "$live" "$rr/live"
-  }
+  test -z "$copy_up" || cleanup_mnt "$live/src"
+  test "$(stat -c %D "$live")" = "$live_id" || mount -o move "$live" "$rr/live"
 }
 
 run_parts() {
