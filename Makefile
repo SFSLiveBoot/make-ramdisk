@@ -145,6 +145,16 @@ NET=1
 RAMDISK_EXTRAS?=_wifi
 endif
 
+KVM_ROOT?=none
+KVM_APPEND=root=$(KVM_ROOT) quiet console=ttyS0
+KVM_OPTS=-nographic -m 512
+
+ifdef KVM_ROOT_SMB
+KVM_ROOT=smb://%@$(KVM_ROOT_SMB)/*.sfs+:\$$arch/*kernel-\$$kver.sfs+mem
+KVM_APPEND+= systemd.unit=multi-user.target ip=dhcp
+NET=1
+endif
+
 ifdef NET
 PROGS+=$(NETPROGS)
 MODS+=$(NETDRV) 
@@ -199,10 +209,6 @@ endif
 DATAFILES+=$(EXTRA_DATAFILES)
 PROGS+=$(EXTRAPROGS)
 MODS+=$(EXTRAMODS)
-
-KVM_APPEND=root=none quiet console=ttyS0
-KVM_OPTS=-nographic
-
 
 # some help variables to get around makefile syntax
 empty=
