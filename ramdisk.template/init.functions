@@ -697,6 +697,29 @@ insert_aufs() {
   mount -t aufs -o remount,ins:1:"$part_dir=rr" aufs "$tgt"
 }
 
+detect_root_type() {
+  local _be
+  test -n "$root_backend" || {
+    for _be in aufs overlay;do
+      if grep -qw $_be /proc/filesystems || modprobe $_be;then
+        root_backend="$_be"
+        break
+      fi
+    done
+  }
+  case "$root_backend" in
+    aufs)
+      prepare_root() { prepare_aufs "$@"; }
+      insert_root() { insert_aufs "$@"; }
+      finalize_root() { true; }
+    ;;
+    *)
+      echo "Don't know how to prepare '$root_backend' root backend" >&2
+      return 1
+    ;;
+  esac
+}
+
 expand_vars() {
   case "$1" in
     *"\$"*) eval echo -n "$1" ;;
@@ -715,7 +738,8 @@ mount_root() {
       return
     ;;
   esac
-  live="$(prepare_aufs "$rr" "$rw_comp")/live"
+  detect_root_type
+  live="$(prepare_root "$rr" "$rw_comp")/live"
   mkdir -p "$live${copy_up:+/src}"
   live_id="$(stat -c %D "$live")"
   for part in $(str_split + $src);do
@@ -736,9 +760,10 @@ mount_root() {
         fi
         test -z "$part_comp" || part_comp="$live/${part_comp##*/}"
       }
-      test -z "$part_comp" || insert_aufs "$rr" "$part_comp"
+      test -z "$part_comp" || insert_root "$rr" "$part_comp"
     done
   done
+  finalize_root "$rr"
   test -z "$copy_up" || {
     local live_src x y
     grep " $live/src" /proc/mounts | tac | while read x live_src y;do
