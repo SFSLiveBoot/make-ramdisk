@@ -329,7 +329,7 @@ prepare_dev () {
   local timeout="$2"
   local cryptkey="$gck"
   local _cryptkey udev_pids
-  local _l_dev
+  local _l_dev _fs
   case "$_dev" in
     LABEL=*) _dev="@${_dev#LABEL=}";;
     UUID=*) _dev="/dev/disk/by-uuid/${_dev#UUID=}";;
@@ -352,7 +352,7 @@ prepare_dev () {
       _dev="$loopdev"
     fi
     wait_exist "$_dev"
-    local _fs="$(fs_type "$_dev")"
+    _fs="$(fs_type "$_dev")"
     if test "$_fs" = "crypto_LUKS" -o "$_fs" = "swap" && cryptsetup isLuks "$_dev";then
       modprobe dm-crypt
       if test -z "$cryptkey" ;then
@@ -414,7 +414,8 @@ is_iface_up() {
 }
 
 wait_ifup() {
-  local  ifaces="$(find_ifaces "$1")" iface="" maxwait="$iface_upwait"
+  local ifaces iface="" maxwait="$iface_upwait"
+  ifaces="$(find_ifaces "$1")"
   test -n "$ifaces" || return 0
   echo -n "Waiting for $ifaces to come up.." >&2
   for iface in $ifaces;do ip_link_up "$iface" ; done
@@ -704,7 +705,7 @@ expand_vars() {
 }
 
 mount_root() {
-  local src="$1" copy_up="" rw_comp="" part part_dst part_comp
+  local src="$1" copy_up="" rw_comp="" part part_dst part_comp live live_id
   case "$src" in mem:*) copy_up="mem"; src="${src#mem:}";esac
   case "$src" in
     *+*) rw_comp="${src##*+}"; src="${src%+*}";;
@@ -714,9 +715,9 @@ mount_root() {
       return
     ;;
   esac
-  local live="$(prepare_aufs "$rr" "$rw_comp")/live"
+  live="$(prepare_aufs "$rr" "$rw_comp")/live"
   mkdir -p "$live${copy_up:+/src}"
-  local live_id="$(stat -c %D "$live")"
+  live_id="$(stat -c %D "$live")"
   for part in $(str_split + $src);do
     part="$(expand_vars "$part")"
     for part_comp in $(prepare_file "$part" "$live${copy_up:+/src}");do
