@@ -63,6 +63,8 @@ fi
 if test -n "$root" -a "$root" != "none";then
   log -n "Mounting root $root.."
 
+  enter_stage mountroot
+
   mount_root "$root"
 
   enter_stage finalize
