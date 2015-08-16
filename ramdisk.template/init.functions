@@ -697,6 +697,42 @@ insert_aufs() {
   mount -t aufs -o remount,ins:1:"$part_dir=rr" aufs "$tgt"
 }
 
+prepare_ovl() {
+  local root_mnt="$1" storage="${2:-mem}" _t
+  _ovl_storage="$(mktemp -d /mnt/ovl-rw.XXXXXX)"
+  mntopts=rw chained_mount "$storage" "$_ovl_storage" >&2
+  _t="$(mktemp "$_ovl_storage/.write-test-XXXXXX")" && rm "$_t" || mount -o remount,rw "$storage" "$_ovl_storage"
+  mkdir -p "$root_mnt" "$_ovl_storage/data"
+  echo "$_ovl_storage/data"
+}
+
+finalize_ovl() {
+  local root_mnt="$1" live="$2" ov_part ov_part_dirs part_mnt lower_list
+  local ovl_rw="${live%/data/live}"
+  for ov_part in $_ovl_parts;do
+    if test -d "$ov_part";then
+      part_mnt="$ov_part"
+    else
+      part_mnt="/.parts/${ov_part##*/}"
+      part_mnt="${part_mnt%.sfs}.$(stat -c %Y "$ov_part")"
+      mkdir -p "$part_mnt"
+      chained_mount "$ov_part" "$part_mnt"
+      ov_part_dirs="${ov_part_dirs:+$ov_part_dirs }$part_mnt"
+    fi
+    lower_list="$part_mnt${lower_list:+:$lower_list}"
+  done
+  mkdir -p "$ovl_rw/.ovl"
+  mount -t overlay -o "lowerdir=$lower_list,upperdir=$ovl_rw/data,workdir=$ovl_rw/.ovl" root-ovl "$root_mnt"
+  mkdir -p "$root_mnt/.parts/rw"
+  mount -o move "$ovl_rw" "$root_mnt/.parts/rw"
+  for ov_part in $ov_part_dirs;do
+    part_mnt="$root_mnt/.parts/${ov_part##*/}"
+    mkdir -p "$part_mnt"
+    mount -o move "$ov_part" "$part_mnt"
+  done
+  echo "$root_mnt/.parts/rw/data/live"
+}
+
 detect_root_type() {
   local _be
   test -n "$root_backend" || {
@@ -711,7 +747,12 @@ detect_root_type() {
     aufs)
       prepare_root() { prepare_aufs "$@"; }
       insert_root() { insert_aufs "$@"; }
-      finalize_root() { true; }
+      finalize_root() { echo "$2"; }
+    ;;
+    overlay)
+      prepare_root() { prepare_ovl "$@"; }
+      insert_root() { _ovl_parts="${_ovl_parts:+$_ovl_parts }$2"; }
+      finalize_root() { finalize_ovl "$@"; }
     ;;
     *)
       echo "Don't know how to prepare '$root_backend' root backend" >&2
@@ -775,7 +816,7 @@ mount_root() {
       test -z "$part_comp" || insert_root "$rr" "$part_comp"
     done
   done
-  finalize_root "$rr"
+  live="$(finalize_root "$rr" "$live")"
   test -z "$copy_up" || cleanup_mnt "$live/src"
   test "$(stat -c %D "$live")" = "$live_id" || mount -o move "$live" "$rr/live"
 }

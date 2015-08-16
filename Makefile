@@ -49,7 +49,7 @@ CRYPTOMODS=dm-crypt $(basename $(notdir $(shell find $(MODDIR)/kernel -name cbc.
 CRYPTOPROGS=cryptsetup
 
 FSMODS=$(call findmod,ext2 ext3 ext4 xfs ntfs vfat reiserfs isofs)
-OTHERMODS=aufs squashfs
+OTHERMODS=$(call findmod,aufs squashfs overlay)
 
 FUSEPROGS=/sbin/mount.fuse
 FUSEMODS=fuse
