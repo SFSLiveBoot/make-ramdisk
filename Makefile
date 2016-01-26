@@ -150,7 +150,7 @@ KVM_APPEND=root=$(KVM_ROOT) quiet console=ttyS0
 KVM_OPTS=-nographic -m 512
 
 ifdef KVM_ROOT_SMB
-KVM_ROOT=smb://%@$(KVM_ROOT_SMB)/*.sfs+:\$$arch/*kernel-\$$kver.sfs+mem
+KVM_ROOT=smb://%@$(KVM_ROOT_SMB)/*.sfs+:$(lastword $(subst :, ,$(KVM_ROOT_SMB)))/\$$arch/*kernel-\$$kver.sfs+mem
 KVM_APPEND+= systemd.unit=multi-user.target ip=dhcp
 NET=1
 endif
