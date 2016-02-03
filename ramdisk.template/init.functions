@@ -12,6 +12,7 @@ max_loop=64
 arch="$(uname -m || true)"
 kver="$(uname -r || true)"
 wpa_conf="/etc/wpa.conf"
+dev_console="dev/console"
 
 #
 # functions
@@ -523,6 +524,7 @@ finalize_boot () {
     mount -o move $mpt $rr$mpt
   done
   test ! -e /etc/resolv.conf || test -e $rr/etc/resolv.conf || test ! -w $rr/etc || cat /etc/resolv.conf >$rr/etc/resolv.conf || true
+  test -e "$rr/$dev_console" || { mkdir -p $rr/dev && mknod "$rr/$dev_console" c 5 1 || dev_console="" ; }
   log
 
   enter_stage runinit
@@ -531,7 +533,7 @@ finalize_boot () {
     test -z "$brk" || return
     test -n "$quiet" || set -x
     cd "$rr"
-    exec run-init -c dev/console $rr $init
+    exec run-init ${dev_console:+-c $dev_console} $rr $init
   else
     echo "Refusing to run-init: '$init' on '$rr' is not executable file"
   fi
