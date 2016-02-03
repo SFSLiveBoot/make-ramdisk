@@ -21,10 +21,14 @@ log () {
   test -n "$quiet" || echo "$@"
 }
 
+create_devices() {
+  /sbin/hotplug INITIALIZE_SYS
+}
+
 init_hotplug() {
   log -n "hotplug "
-  /sbin/hotplug INITIALIZE_SYS
-  echo /sbin/hotplug >/proc/sys/kernel/hotplug
+  create_devices
+  echo /sbin/hotplug >/proc/sys/kernel/hotplug || hotplug_fail="reg"
   log
 }
 
@@ -138,6 +142,7 @@ wait_exist() {
     devinfo=""
     sleep 1
     timeout=$(($timeout-1))
+    test -z "$hotplug_fail" || create_devices
   done
   test -n "$devinfo" || echo "]"
 }
@@ -347,6 +352,7 @@ prepare_dev () {
     local fileext="${_dev##*.}"
     if ! test -b "$_dev";then
       test -n "$loop_loaded" || load_loop
+      test -z "$hotplug_fail" || create_devices
       while ! test -e /dev/loop0; do sleep 1;done
       local loopdev=`losetup -f`
       losetup $loopdev "$_dev"
