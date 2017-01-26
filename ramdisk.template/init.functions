@@ -896,6 +896,7 @@ auto_root() {
 
 refresh_lvm() {
   rm -f /etc/lvm/cache/.cache
+  lvm vgscan --mknodes
   lvm vgchange -a y
 }
 

@@ -10,6 +10,12 @@ create_block_links() {
       ln -s "../../$dev" "/dev/disk/by-uuid/$UUID" || true
     test -z "$LABEL" || test -L "/dev/disk/by-label/$LABEL" ||
       ln -s "../../$dev" "/dev/disk/by-label/$LABEL" || true
+    case "$TYPE" in
+      LVM2_member)
+        lvm vgscan --mknodes
+        lvm vgchange -a y
+      ;;
+    esac
   fi
   rm "$blk_info"
 }
