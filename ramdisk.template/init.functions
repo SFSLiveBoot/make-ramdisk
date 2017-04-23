@@ -524,6 +524,8 @@ finalize_boot () {
     esac
   done </proc/mounts
 
+  dmsetup remove_all || true
+
   log -n "Migrating:"
   for mpt in $migrate_list;do
     log -n " $mpt"
