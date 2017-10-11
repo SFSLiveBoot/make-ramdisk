@@ -43,7 +43,7 @@ if test -z "$dst";then
   exit 1
 fi
 
-libdirs="/lib /usr/lib $(ldconfig -p | sed -ne '/=>/{s@.*=> \(.*\)/.*@\1@;p}' | sort -u)"
+libdirs="/lib /usr/lib /lib/systemd $(ldconfig -p | sed -ne '/=>/{s@.*=> \(.*\)/.*@\1@;p}' | sort -u)"
 
 mkdir -p "$dst$libdir"
 
