@@ -55,7 +55,7 @@ get_missing_reqs() {
     read hdr opts <"$tgt"
     case "$hdr" in
       ?ELF*)
-        local interp="`objcopy -j .interp "$1" -O binary /proc/self/fd/1 2>/dev/null`"
+        local interp="$(objcopy -j .interp "$1" -O binary /proc/self/fd/1 | tr -d \\0)"
         test -z "$interp" || need_copy "$interp" "$dst" $libpath && interpreters="$interpreters $interp"
         reqs="$reqs `get_missing_elf_reqs "$tgt"`" ;;
       "#!"*)
