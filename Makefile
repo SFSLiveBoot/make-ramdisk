@@ -55,7 +55,7 @@ DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers \( -path "$(MO
 CRYPTOMODS=dm-crypt $(basename $(notdir $(shell find $(MODDIR)/kernel -name cbc.ko $(patsubst %,-or -name '%*.ko',aes sha arc4 xts))))
 CRYPTOPROGS=cryptsetup
 
-FSMODS=$(call findmod,ext2 ext3 ext4 xfs ntfs vfat reiserfs isofs)
+FSMODS=$(call findmod,ext2 ext3 ext4 xfs ntfs vfat reiserfs isofs crc32 crc16 crc32c)
 OTHERMODS=$(call findmod,aufs squashfs overlay)
 
 FUSEPROGS=/sbin/mount.fuse
