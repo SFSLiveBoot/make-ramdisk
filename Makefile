@@ -1,3 +1,8 @@
+# some help variables to get around makefile syntax
+empty=
+space=$(empty) $(empty)
+comma=,
+
 KVERS=$(shell uname -r)
 ARCH_LIB=$(dir $(shell ldd /bin/sh | grep "libc.so." | grep -o '/lib[^[:space:]]*'))
 MODDIR=/lib/modules/$(KVERS)/
@@ -14,7 +19,9 @@ RD_TMPL=ramdisk.template
 RD_FILES=$(shell find $(RD_TMPL) -not -type l)
 
 findprog=$(shell find {/usr,}/{s,}bin -maxdepth 1 \( -false $(foreach name,$(1),-or -name "$(name)") \))
-findmod=$(basename $(notdir $(shell find $(MODDIR) \( -false $(foreach name,$(1),-or -name "$(subst -,[-_],$(name)).ko") \))))
+findmod_file=$(basename $(notdir $(shell find $(MODDIR) \( -false $(foreach name,$(1),-or -name "$(subst -,[-_],$(name)).ko") \))))
+findmod_alias=$(call findmod_file,$(shell awk '/^alias ($(subst $(space),|,$(1))) /{print $$3}' $(MODDIR)modules.alias | tr _ -))
+findmod=$(call findmod_file,$(1)) $(call findmod_alias,$(1))
 
 ISO=cdrom.iso
 ISO_LABEL=Linux Live
@@ -209,11 +216,6 @@ endif
 DATAFILES+=$(EXTRA_DATAFILES)
 PROGS+=$(EXTRAPROGS)
 MODS+=$(EXTRAMODS)
-
-# some help variables to get around makefile syntax
-empty=
-space=$(empty) $(empty)
-comma=,
 
 # function list starts at word 57
 BBHELP=$(shell busybox --help)
