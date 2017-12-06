@@ -46,7 +46,7 @@ NET_DISABLED_PPP=ppp
 NET_DISABLED=arcnet/ phy/ appletalk/ tokenring/ wan/ pcmcia/ hamradio/ irda/ $(NET_DISABLED_PPP) $(NET_DISABLED_WIFI)
 
 NIC_DRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net -name '*.ko' $(patsubst %,-not -path '*/%*',$(NET_DISABLED)))))
-NETDRV=$(NIC_DRV) $(call findmod,cifs nfs md4 hmac des_generic ecb arc4 nbd)
+NETDRV=$(NIC_DRV) $(call findmod,cifs nfs md4 hmac des_generic ecb arc4 nbd cmac)
 
 USBHID_MODS=$(call findmod,uhci-hcd ehci-hcd ohci-hcd usbhid hid-generic)
 USBMODS=$(USBHID_MODS) $(call findmod,sd-mod usb-storage) $(notdir $(shell find $(MODDIR)/kernel/drivers/usb/{storage,host} -name "*.ko"))
