@@ -9,7 +9,7 @@ MODDIR=/lib/modules/$(KVERS)/
 
 SHELL=/bin/bash
 PATH:=$(PATH):/sbin:/usr/sbin
-RAMDISK=ramdisk$(RAMDISK_EXTRAS)-$(KVERS)
+RAMDISK=$(RAMDISK_DESTDIR)ramdisk$(RAMDISK_EXTRAS)-$(KVERS)
 ifndef RD_DIR
   RD_DIR:=$(shell mktemp -d /tmp/ramdisk.XXXXXX)
   export RD_DIR
