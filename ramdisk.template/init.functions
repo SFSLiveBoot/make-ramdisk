@@ -271,7 +271,7 @@ prepare_file_dev() {
   local dev="${1%%:*}" fname="${1#*:}"  fname_match
   local mpt="${2:-$(mktemp -d /mnt/prep-XXXXXX)}"
   prepare_dev "$dev" >&2
-  mount -o ro -t $prepared_filesystem $prepared_device $mpt
+  mount -o "${mntopts:-ro}"  -t $prepared_filesystem $prepared_device $mpt
   echo -n "$mpt/" >/tmp/.last-dev
   expand_wildcards "$mpt/$fname"
 }
@@ -339,6 +339,12 @@ prepare_dev () {
   case "$_dev" in
     LABEL=*) _dev="@${_dev#LABEL=}";;
     UUID=*) _dev="/dev/disk/by-uuid/${_dev#UUID=}";;
+  esac
+  case "$_dev" in
+    *"?"*)
+      mntopts="${_dev#*\?}"
+      _dev="${_dev%%\?*}"
+      ;;
   esac
   if test -z "${_dev%@*}";then
     if _l_dev="$(blkid -L "${_dev#@}")";then
