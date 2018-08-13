@@ -50,7 +50,7 @@ NETDRV=$(NIC_DRV) $(call findmod,cifs nfs md4 hmac des_generic ecb arc4 nbd cmac
 
 USBHID_MODS=$(call findmod,uhci-hcd ehci-hcd ohci-hcd usbhid hid-generic)
 USBMODS=$(USBHID_MODS) $(call findmod,sd-mod usb-storage) $(notdir $(shell find $(MODDIR)/kernel/drivers/usb/{storage,host} -name "*.ko"))
-DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers \( -path "$(MODDIR)/kernel/drivers/ata/*" -o -path "$(MODDIR)/kernel/drivers/scsi/*" -o -path "$(MODDIR)/kernel/drivers/ide/*" \) -name '*.ko'))) $(call findmod,cciss mptspi mptsas mmc_block sdhci_pci virtio_blk virtio_pci loop)
+DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers \( -path "$(MODDIR)/kernel/drivers/mmc/*" -o -path "$(MODDIR)/kernel/drivers/memstick/*" -o -path "$(MODDIR)/kernel/drivers/ata/*" -o -path "$(MODDIR)/kernel/drivers/scsi/*" -o -path "$(MODDIR)/kernel/drivers/ide/*" \) -name '*.ko'))) $(call findmod,cciss mptspi mptsas mmc_block nvme memstick sdhci_pci virtio_blk virtio_pci loop)
 
 CRYPTOMODS=dm-crypt $(basename $(notdir $(shell find $(MODDIR)/kernel -name cbc.ko $(patsubst %,-or -name '%*.ko',aes sha arc4 xts))))
 CRYPTOPROGS=cryptsetup
