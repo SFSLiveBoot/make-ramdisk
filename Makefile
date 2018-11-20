@@ -58,6 +58,9 @@ CRYPTOPROGS=cryptsetup
 FSMODS=$(call findmod,ext2 ext3 ext4 xfs ntfs vfat reiserfs btrfs isofs crc32 crc16 crc32c)
 OTHERMODS=$(call findmod,aufs squashfs overlay)
 
+VIDEOMODS=$(call findmod,i915)
+VIDEOPROGS=$(call findprog,vbetool)
+
 FUSEPROGS=/sbin/mount.fuse
 FUSEMODS=fuse
 
@@ -74,11 +77,11 @@ WIFIMODS=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net/wireless 
 WIFIPROGS=iwlist iwconfig
 
 DISKMODS=$(DISKDRV) $(call findmod,nls-cp437 nls-iso8859-1 nls-utf8 cdrom i2c-i801)
-MODS=$(DISKMODS) $(FSMODS) $(OTHERMODS) $(USBMODS)
+MODS=$(DISKMODS) $(FSMODS) $(OTHERMODS) $(USBMODS) $(VIDEOMODS)
 NORMMODS=yenta_socket $(CRYPTOMODS)
 
 MINPROGS=modprobe /usr/lib/klibc/bin/* $(wildcard /lib/libnss_files.so.* $(ARCH_LIB)/libnss_files.so.*) /sbin/{dmsetup,blkid} $(UDEVPROGS)
-NORMPROGS=rmmod halt busybox losetup $(call findprog,fdisk lspci lvm kexec) $(CRYPTOPROGS)
+NORMPROGS=rmmod halt busybox losetup $(call findprog,fdisk lspci lvm kexec) $(CRYPTOPROGS) $(VIDEOPROGS)
 
 TPM_PROGS=tcsd
 TPM_MODS=$(basename $(shell find $(MODDIR) -name "tpm*.ko"))
