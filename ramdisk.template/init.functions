@@ -13,6 +13,7 @@ arch="$(uname -m || true)"
 kver="$(uname -r || true)"
 wpa_conf="/etc/wpa.conf"
 dev_console="dev/console"
+ntfs3g_opts="rw,uid=0,gid=4,fmask=0137,dmask=0027"
 
 #
 # functions
@@ -271,7 +272,9 @@ prepare_file_dev() {
   local dev="${1%%:*}" fname="${1#*:}"  fname_match
   local mpt="${2:-$(mktemp -d /mnt/prep-XXXXXX)}"
   prepare_dev "$dev" >&2
-  mount -o "${mntopts:-ro}"  -t $prepared_filesystem $prepared_device $mpt
+  test "$prepared_filesystem" = "ntfs" -a -x "$(which ntfs-3g)" &&
+    ntfs-3g -o "${mntopts:-$ntfs3g_opts}" $prepared_device $mpt ||
+    mount -o "${mntopts:-ro}" -t $prepared_filesystem $prepared_device $mpt
   echo -n "$mpt/" >/tmp/.last-dev
   expand_wildcards "$mpt/$fname"
 }
