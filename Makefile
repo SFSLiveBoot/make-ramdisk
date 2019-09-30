@@ -260,7 +260,9 @@ $(RAMDISK): $(RD_FILES) Makefile
 	grep -h -o "GROUP=[^ ]*" "$(RD_DIR)/lib/udev/rules.d"/*.rules | sed -e 's/GROUP="\([^"]*\)".*/^\1:/' | sort -u | grep -f - /etc/group | cut -f1-3 -d: | sed -e 's/$$/:/' >"$(RD_DIR)/etc/group"
 	env MODDIR=$(MODDIR) KVERS=$(KVERS) ./moddep $(RD_DIR) -r "$(RELAXMODS)" $(sort $(basename $(notdir $(MODS))))
 	test -z "$(NO_MAKEFLAGS)" || echo "$$MAKEFLAGS" >"$(RD_DIR)/.makeflags"
-	(cd "$(RD_DIR)"; find . -not -name . | fakeroot cpio -L -V -o -H newc) | gzip -1 >"$(RAMDISK)"
+	(cd "$(RD_DIR)"; find . -not -name . | fakeroot cpio -L -V -o -H newc) >"$(RAMDISK).tmp"
+	gzip -1 <"$(RAMDISK).tmp" >"$(RAMDISK)"
+	rm -f "$(RAMDISK).tmp"
 
 $(ISO_DIR):	$(ISO_FILES) ramdisk
 	cp -T -r $(ISO_TMPL) $(ISO_DIR)
