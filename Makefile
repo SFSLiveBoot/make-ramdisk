@@ -251,6 +251,7 @@ $(RAMDISK): $(RD_FILES) Makefile
 	test -z "$(DATADIRS)" || cp --parents -r $(DATADIRS) $(RD_DIR)
 	test -z "$(DATAFILES)" || cp --parents $(DATAFILES) $(RD_DIR)
 	test ! -e "$(RD_DIR)/sbin/udevadm" -o -e "$(RD_DIR)/sbin/udevsettle" || ln -s udevadm "$(RD_DIR)/sbin/udevsettle"
+	test -e "$(RD_DIR)/bin/sh" -o ! -e "$(RD_DIR)/bin/busybox" || { ln="$$("$(RD_DIR)/bin/busybox" --help | grep -n ^Currently | cut -f1 -d:)"; for x in $$("$(RD_DIR)/bin/busybox" --help | tail -n+$$(($$ln+1)) | tr -d ,);do ln -s busybox "$(RD_DIR)/bin/$$x";done; }
 	test ! -e "$(RD_DIR)/usr/lib/klibc/bin/sh.shared" -o -e "$(RD_DIR)/bin/sh" || ln -s ../usr/lib/klibc/bin/sh.shared "$(RD_DIR)/bin/sh"
 	test ! -e "$(RD_DIR)/bin/sh" -o -e "$(RD_DIR)/bin/bash" || ln -s sh "$(RD_DIR)/bin/bash"
 	test -z "$(MODS_PRELOAD)" || for mod in $(MODS_PRELOAD);do echo "$$mod" ; done > "$(RD_DIR)/etc/modules.preload"
@@ -260,7 +261,7 @@ $(RAMDISK): $(RD_FILES) Makefile
 	grep -h -o "GROUP=[^ ]*" "$(RD_DIR)/lib/udev/rules.d"/*.rules | sed -e 's/GROUP="\([^"]*\)".*/^\1:/' | sort -u | grep -f - /etc/group | cut -f1-3 -d: | sed -e 's/$$/:/' >"$(RD_DIR)/etc/group"
 	env MODDIR=$(MODDIR) KVERS=$(KVERS) ./moddep $(RD_DIR) -r "$(RELAXMODS)" $(sort $(basename $(notdir $(MODS))))
 	test -z "$(NO_MAKEFLAGS)" || echo "$$MAKEFLAGS" >"$(RD_DIR)/.makeflags"
-	(cd "$(RD_DIR)"; find . -not -name . | fakeroot cpio -L -V -o -H newc) >"$(RAMDISK).tmp"
+	(cd "$(RD_DIR)"; find . -not -name . | fakeroot cpio -o -V -H newc) >"$(RAMDISK).tmp"
 	gzip -1 <"$(RAMDISK).tmp" >"$(RAMDISK)"
 	rm -f "$(RAMDISK).tmp"
 
