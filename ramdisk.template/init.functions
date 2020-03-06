@@ -72,6 +72,7 @@ init_ramdisk () {
   test -e /etc/mtab -o -L /etc/mtab || ln -s /proc/mounts /etc/mtab
   test -d /proc/$$ || mount -t proc none /proc 
   test -d /sys/kernel || mount -t sysfs none /sys
+  grep -q /dev /proc/mounts || mount -t devtmpfs devtmpfs /dev || echo "Failed to mount /dev .."
   echo -n '[9;0]'
   test ! -x /bin/busybox || /bin/busybox --install -s || false
 }

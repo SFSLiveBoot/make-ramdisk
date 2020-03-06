@@ -67,10 +67,8 @@ FUSEMODS=fuse
 
 NTFSPROGS=$(call findprog,ntfs* scrounge-ntfs)
 
-ifeq ($(shell dpkg -s udev | grep -q "^Source: systemd" || echo non-systemd),non-systemd)
-UDEVPROGS=udev{d,adm} $(shell find $$(dpkg -L udev  | grep '^/lib/udev/[^/]*$$') -maxdepth 0 -type f)
-UDEVFILES=$(shell dpkg -L udev dmsetup | grep -E '^/lib/udev/rules.d/') $(shell find /lib/udev/keymaps -type f)
-endif
+UDEVPROGS=$(call findprog,udevd udevadm) $(shell find /lib/systemd/ -maxdepth 1 -name systemd-udevd -perm /1) $(shell find $$(dpkg -L udev | grep '^/lib/udev/[^/]*$$') -maxdepth 0 -type f -perm /1)
+UDEVFILES=$(shell dpkg -L udev dmsetup lvm2 | grep -E '^/lib/udev/(keymaps|(hwdb|rules).d)/') $(shell find /lib/udev/ -name hwdb.bin)
 
 NETPROGS=$(wildcard /lib/libnss_dns.so.* /lib/libnss_files.so.* $(ARCH_LIB)/libnss_files.so.* $(ARCH_LIB)/libnss_dns.so.*) $(call findprog,telnet udp-[rs]e*er *mount.cifs socat xnbd-client)
 
@@ -260,6 +258,7 @@ $(RAMDISK): $(RD_FILES) Makefile
 	test -z "$(SSH_PUBKEY)" || { mkdir -p $(RD_DIR)/.ssh ; echo "$(SSH_PUBKEY)" >$(RD_DIR)/.ssh/authorized_keys ; }
 	test -z "$(APPEND)" || echo "$(APPEND)" >$(RD_DIR)/cmdline
 	grep -h -o "GROUP=[^ ]*" "$(RD_DIR)/lib/udev/rules.d"/*.rules | sed -e 's/GROUP="\([^"]*\)".*/^\1:/' | sort -u | grep -f - /etc/group | cut -f1-3 -d: | sed -e 's/$$/:/' >"$(RD_DIR)/etc/group"
+	test ! -x $(RD_DIR)/lib/systemd/systemd-udevd -o -x $(RD_DIR)/sbin/udevd || mv $(RD_DIR)/lib/systemd/systemd-udevd $(RD_DIR)/sbin/udevd
 	env MODDIR=$(MODDIR) KVERS=$(KVERS) ./moddep $(RD_DIR) -r "$(RELAXMODS)" $(sort $(basename $(notdir $(MODS))))
 	test -z "$(NO_MAKEFLAGS)" || echo "$$MAKEFLAGS" >"$(RD_DIR)/.makeflags"
 	(cd "$(RD_DIR)"; find . -not -name . | fakeroot cpio -o -V -H newc) >"$(RAMDISK).tmp"
