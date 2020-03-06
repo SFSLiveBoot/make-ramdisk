@@ -856,7 +856,7 @@ enter_stage () {
   stage="$1"
   test -z "$verbose" || echo "[$stage]"
   test "$brk" != "$stage" || exit
-  test "$verbose" != "$stage" || set -x
+  case ",$verbose," in ",all,"|*,"$stage",*) set -x;;esac
   test ! -r "/scripts/$stage" || . "/scripts/$stage"
   test ! -d "/scripts/$stage.d" || run_parts "/scripts/$stage.d"
 }
