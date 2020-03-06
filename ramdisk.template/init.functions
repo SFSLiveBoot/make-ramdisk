@@ -790,7 +790,15 @@ expand_vars() {
 
 copy_part() {
   local live="$1" part_comp="$2"
-  echo -n "Copying $part_comp .. " >&2
+  local part_src="${part_comp%/*}"
+  part_src="${part_src#$live/src/}"
+  test -e /tmp/.last-copy-part-src && test "x$(cat /tmp/.last-copy-part-src)" = "x$part_src" || {
+    echo "$part_src" >/tmp/.last-copy-part-src
+    echo "Copying from $part_src:" >&2
+  }
+  local copy_start_stamp="$(date +%s)"
+  local copy_size="$(stat -L -c %s "$part_comp")"
+  echo -n "  ${part_comp##*/} ${copy_size:+($(($copy_size/1024)) kB)}.. " >&2
   if test "$(stat -c %D "$part_comp")" = "$(stat -c %D "$live")";then
     mv "$part_comp" "$live" >&2
   else
@@ -801,7 +809,10 @@ copy_part() {
       cp "$part_comp" "$live" >&2
     fi
   fi
-  echo "ok." >&2
+  local copy_end_stamp="$(date +%s)"
+  local copy_seconds="$(($copy_end_stamp-$copy_start_stamp))"
+  test ! "x$copy_seconds" = "x0" || copy_size=""
+  echo "ok. (${copy_seconds}s${copy_size:+, $(($copy_size/1024/$copy_seconds)) kB/s})" >&2
   test -z "$part_comp" || part_comp="$live/${part_comp##*/}"
   echo "$part_comp"
 }
