@@ -12,8 +12,9 @@ PATH:=$(PATH):/sbin:/usr/sbin
 RAMDISK=$(RAMDISK_DESTDIR)ramdisk$(RAMDISK_EXTRAS)-$(KVERS)
 ifndef RD_DIR
   RD_DIR:=$(shell mktemp -d /tmp/ramdisk.XXXXXX)
-  export RD_DIR
+  REMOVE_RD_DIR=1
 endif
+export RD_DIR
 
 RD_TMPL=ramdisk.template
 RD_FILES=$(shell find $(RD_TMPL) -not -type l)
@@ -229,7 +230,7 @@ BBFUNC=$(subst $(comma),,$(wordlist 57,$(words $(BBHELP)),$(BBHELP)))
 all:	ramdisk
 
 ramdisk:	$(RAMDISK)
-	$(RM) -r $(RD_DIR)
+	test -z $(REMOVE_RD_DIR) || $(RM) -r $(RD_DIR)
 
 clean:
 	$(RM) -r $(RD_DIR) $(RAMDISK) $(ISO)
@@ -238,7 +239,7 @@ mrproper: clean
 	$(RM) -r $(ISO_DIR)
 
 test:	$(RAMDISK)
-	$(RM) -r $(RD_DIR)
+	test -z $(REMOVE_RD_DIR) || $(RM) -r $(RD_DIR)
 	kvm -kernel /boot/vmlinuz-$(KVERS) -initrd $(RAMDISK) -append "$(KVM_APPEND)" $(KVM_OPTS)
 
 nfsroot:	clean
