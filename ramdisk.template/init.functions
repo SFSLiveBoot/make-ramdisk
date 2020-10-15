@@ -308,7 +308,7 @@ prepare_file() {
   case "$src" in 
     smb://*) prepare_file_smb "$@";;
     tftp://*) prepare_file_tftp "$@" ;;
-    http://*) prepare_file_wget "$@" ;;
+    http://*|https://*) prepare_file_wget "$@" ;;
     ftp://*) prepare_file_wget "$@" ;;
     pkcs15://*) prepare_file_pkcs15 "$@" ;;
     nbd://*) prepare_file_nbd "$@" ;;
