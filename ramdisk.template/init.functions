@@ -47,7 +47,7 @@ init_udev () {
   test -e /dev/tty || mknod /dev/tty c 5 0
   echo "udev_log=\"$udevl\"" >/etc/udev/udev.conf
   test -z "$no_volid" || echo "# Disabled with no_volid" >/etc/udev/rules.d/vol_id.rules
-  echo >/proc/sys/kernel/hotplug
+  test ! -e /proc/sys/kernel/hotplug || echo >/proc/sys/kernel/hotplug
   test -n "`getpids udevd`" || udevd --daemon
   log -n "generating devices "
   udevadm trigger
