@@ -829,7 +829,14 @@ mount_root() {
   local src="$1" copy_up="" rw_comp="" part part_dst part_comp live live_id
   case "$src" in mem:*) copy_up="mem"; src="${src#mem:}";esac
   case "$src" in
-    *+*) rw_comp="${src##*+}"; src="${src%+*}";;
+    *+*)
+      rw_comp="${src##*+}"; src="${src%+*}"
+      case "$rw_comp" in :*)
+        rw_comp="${src%%:*}$rw_comp"
+        src=":${src#*:}"
+        echo -n "/live/" >/tmp/.last-dev
+      ;; esac
+    ;;
     *)
       mkdir -p /realroot
       chained_mount "$src" /realroot
