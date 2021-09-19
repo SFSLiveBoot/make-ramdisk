@@ -75,7 +75,7 @@ NETPROGS=$(wildcard /lib/libnss_dns.so.* /lib/libnss_files.so.* $(ARCH_LIB)/libn
 WIFIMODS=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net/wireless -name '*.ko')))
 WIFIPROGS=iwlist iwconfig
 
-DISKMODS=$(DISKDRV) $(call findmod,nls-cp437 nls-iso8859-1 nls-utf8 cdrom i2c-i801)
+DISKMODS=$(DISKDRV) $(call findmod,nls-cp437 nls-iso8859-1 nls-ascii nls-utf8 cdrom i2c-i801)
 MODS=$(DISKMODS) $(FSMODS) $(OTHERMODS) $(USBMODS) $(VIDEOMODS)
 NORMMODS=yenta_socket $(CRYPTOMODS)
 
@@ -94,7 +94,7 @@ PKCS15_FILES=$(shell find /usr/lib/pcsc/drivers -not -name "*.so*" -not -type d)
 MODFILES=$(shell find "$(MODDIR)" -name "modules.builtin" -o -name "modules.order")
 9P_MODS=9p $(call findmod,9pnet_virtio virtio_pci virtio_mmio virtio_balloon virtio_net)
 
-RELAXMODS=fuse cdrom ehci-hcd loop ohci-hcd uhci-hcd aufs ext2 ext3 ext4 sd-mod yenta_socket reiserfs sdhci_pci
+RELAXMODS=fuse cdrom ehci-hcd loop ohci-hcd uhci-hcd aufs ext2 ext3 ext4 sd-mod yenta_socket reiserfs sdhci_pci rtsx_pci_sdmmc
 
 DATAFILES=$(MODFILES) $(UDEVFILES)
 
