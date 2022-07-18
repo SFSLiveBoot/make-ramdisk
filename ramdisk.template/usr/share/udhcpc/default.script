@@ -10,14 +10,14 @@ case "$1" in
   bound)
     ip addr add $ip/$mask dev $interface
     test -z "$router" || ip route add default via $router dev $interface
-    mkdir -p /run/resolvconf/interfaces
+    mkdir -p /run/resolvconf/interface
     test -z "$dns" || {
       echo "$dns" | tr ' ' '\n' | sed -e 's/^/nameserver /' >/etc/resolv.conf
-      echo "$dns" | tr ' ' '\n' | sed -e 's/^/nameserver /' >"/run/resolvconf/interfaces/$interface"
+      echo "$dns" | tr ' ' '\n' | sed -e 's/^/nameserver /' >"/run/resolvconf/interface/$interface"
     }
     test -z "$domain" || {
       echo "domain $domain" >>/etc/resolv.conf
-      echo "domain $domain" >>"/run/resolvconf/interfaces/$interface"
+      echo "domain $domain" >>"/run/resolvconf/interface/$interface"
      }
     test -z "$serverid" || grep -q server /etc/hosts || echo "$serverid server" >>/etc/hosts
   ;;
