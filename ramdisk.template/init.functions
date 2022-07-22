@@ -525,7 +525,7 @@ get_mount_type () {
 }
 
 finalize_boot () {
-  killall udevd
+  killall udevd || true
   local migrate_list src mpt opts
   while read src mpt opts; do
     case $mpt in
