@@ -44,7 +44,7 @@ MODS_RUNNING=$(shell grep -v '^[^ ]* [^ ]* 0 ' /proc/modules | cut -f1 -d" " | g
 
 NET_DISABLED_WIFI=wireless/ wlan
 NET_DISABLED_PPP=ppp
-NET_DISABLED=arcnet/ phy/ appletalk/ tokenring/ wan/ pcmcia/ hamradio/ irda/ $(NET_DISABLED_PPP) $(NET_DISABLED_WIFI)
+NET_DISABLED=arcnet/ appletalk/ tokenring/ wan/ pcmcia/ hamradio/ irda/ $(NET_DISABLED_PPP) $(NET_DISABLED_WIFI)
 
 NIC_DRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net -name '*.ko' $(patsubst %,-not -path '*/%*',$(NET_DISABLED)))))
 NETDRV=$(NIC_DRV) $(call findmod,cifs nfs md4 hmac des_generic ecb arc4 nbd cmac)
