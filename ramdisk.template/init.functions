@@ -387,6 +387,7 @@ prepare_dev () {
     fi
     test -n "$_fs" -o "$fileext" != "sfs" || _fs=squashfs
     test "$_fs" != "LVM2_member" -o ! -x /sbin/lvm || refresh_lvm
+    test "$_fs" = "ntfs" && ( grep -qw ntfs3 /proc/filesystems || modprobe ntfs3 ) && _fs="ntfs3" || true
     prepared_device="$_dev"
     prepared_filesystem="$_fs"
   else
