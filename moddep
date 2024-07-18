@@ -46,13 +46,13 @@ get_deps() {
 to_filenames() {
   local pat name n=0 found not_found names
   for name;do
-    if test -z "${name#*.ko}";then echo $name;else
+    if test -z "${name#*.ko}" -o -z "${name#*.ko.xz}";then echo $name;else
       names="${names:+$names }$name"
     fi
   done
   if test -n "$names";then
-    found="$(grep -E "/($(echo $names | sed -e 's/ /|/g' -e 's/[_-]/[_-]/g'))\\.ko:" "$MODDIR/modules.dep" | cut -f1 -d:)"
-    not_found="$(echo $names | sed -e 's/ /\n/g' | grep -vE "($(echo $found | sed -e 's@[^ ]*/@@g' -e 's/\.ko//g' -e 's/ /|/g' -e 's/[_-]/[_-]/g'))")"
+    found="$(grep -E "/($(echo $names | sed -e 's/ /|/g' -e 's/[_-]/[_-]/g'))\\.ko(\.xz)?:" "$MODDIR/modules.dep" | cut -f1 -d:)"
+    not_found="$(echo $names | sed -e 's/ /\n/g' | grep -vE "($(echo $found | sed -e 's@[^ ]*/@@g' -e 's/\.ko\(\.xz\)\?//g' -e 's/ /|/g' -e 's/[_-]/[_-]/g'))")"
     test -z "$not_found" || {
       not_found="$(list_new_nondup "$missing_ok" $not_found)"
     }
@@ -77,7 +77,7 @@ strip_path_prefix() {
 }
 add_builtin_to_missing_ok() {
   local mod
-  for mod in $(sed -e 's@.*/@@' -e 's@.ko$@@' $MODDIR/modules.builtin);do
+  for mod in $(sed -e 's@.*/@@' -e 's@\.ko\(\.xz\)\?$@@' $MODDIR/modules.builtin);do
     missing_ok="${missing_ok:+$missing_ok }$mod"
   done
 }

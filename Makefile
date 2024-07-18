@@ -20,7 +20,7 @@ RD_TMPL=ramdisk.template
 RD_FILES=$(shell find $(RD_TMPL) -not -type l)
 
 findprog=$(shell find {/usr,}/{s,}bin -maxdepth 1 \( -false $(foreach name,$(1),-or -name "$(name)") \))
-findmod_file=$(basename $(notdir $(shell find $(MODDIR) \( -false $(foreach name,$(1),-or -name "$(subst -,[-_],$(name)).ko") \))))
+findmod_file=$(basename $(basename $(notdir $(shell find $(MODDIR) \( -false $(foreach name,$(1),-or -name "$(subst -,[-_],$(name)).ko*") \)))))
 findmod_alias=$(call findmod_file,$(shell awk '/^alias ($(subst $(space),|,$(1))) /{print $$3}' $(MODDIR)modules.alias | tr _ -))
 findmod=$(call findmod_file,$(1)) $(call findmod_alias,$(1))
 
@@ -46,14 +46,14 @@ NET_DISABLED_WIFI=wireless/ wlan
 NET_DISABLED_PPP=ppp
 NET_DISABLED=arcnet/ appletalk/ tokenring/ wan/ pcmcia/ hamradio/ irda/ $(NET_DISABLED_PPP) $(NET_DISABLED_WIFI)
 
-NIC_DRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net -name '*.ko' $(patsubst %,-not -path '*/%*',$(NET_DISABLED)))))
+NIC_DRV=$(basename $(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net -name '*.ko*' $(patsubst %,-not -path '*/%*',$(NET_DISABLED))))))
 NETDRV=$(NIC_DRV) $(call findmod,cifs nfs md4 hmac des_generic ecb arc4 nbd cmac)
 
 USBHID_MODS=$(call findmod,uhci-hcd ehci-hcd ohci-hcd usbhid hid-generic)
-USBMODS=$(USBHID_MODS) $(call findmod,sd-mod usb-storage) $(notdir $(shell find $(MODDIR)/kernel/drivers/usb/{storage,host} -name "*.ko"))
-DISKDRV=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers \( -path "$(MODDIR)/kernel/drivers/mmc/*" -o -path "$(MODDIR)/kernel/drivers/memstick/*" -o -path "$(MODDIR)/kernel/drivers/ata/*" -o -path "$(MODDIR)/kernel/drivers/scsi/*" -o -path "$(MODDIR)/kernel/drivers/ide/*" \) -name '*.ko'))) $(call findmod,cciss mptspi mptsas mmc_block nvme memstick sdhci_pci virtio_blk virtio_pci loop)
+USBMODS=$(USBHID_MODS) $(call findmod,sd-mod usb-storage) $(notdir $(shell find $(MODDIR)/kernel/drivers/usb/{storage,host} -name "*.ko*"))
+DISKDRV=$(basename $(basename $(notdir $(shell find $(MODDIR)/kernel/drivers \( -path "$(MODDIR)/kernel/drivers/mmc/*" -o -path "$(MODDIR)/kernel/drivers/memstick/*" -o -path "$(MODDIR)/kernel/drivers/ata/*" -o -path "$(MODDIR)/kernel/drivers/scsi/*" -o -path "$(MODDIR)/kernel/drivers/ide/*" \) -name '*.ko*')))) $(call findmod,cciss mptspi mptsas mmc_block nvme memstick sdhci_pci virtio_blk virtio_pci loop)
 
-CRYPTOMODS=dm-crypt $(basename $(notdir $(shell find $(MODDIR)/kernel -name cbc.ko $(patsubst %,-or -name '%*.ko',aes sha arc4 xts))))
+CRYPTOMODS=dm-crypt $(basename $(basename $(notdir $(shell find $(MODDIR)/kernel -name "cbc.ko*" $(patsubst %,-or -name '%*.ko*',aes sha arc4 xts)))))
 CRYPTOPROGS=cryptsetup
 
 FSMODS=$(call findmod,ext2 ext3 ext4 xfs ntfs ntfs3 vfat reiserfs btrfs isofs crc32 crc16 crc32c)
@@ -72,7 +72,7 @@ UDEVFILES=$(shell dpkg -L udev dmsetup lvm2 | grep -E '^/lib/udev/(keymaps|(hwdb
 
 NETPROGS=$(wildcard /lib/libnss_dns.so.* /lib/libnss_files.so.* $(ARCH_LIB)/libnss_files.so.* $(ARCH_LIB)/libnss_dns.so.*) $(call findprog,telnet udp-[rs]e*er *mount.cifs socat xnbd-client)
 
-WIFIMODS=$(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net/wireless -name '*.ko')))
+WIFIMODS=$(basename $(basename $(notdir $(shell find $(MODDIR)/kernel/drivers/net/wireless -name '*.ko*'))))
 WIFIPROGS=iwlist iwconfig
 
 DISKMODS=$(DISKDRV) $(call findmod,nls-cp437 nls-iso8859-1 nls-ascii nls-utf8 cdrom i2c-i801)
@@ -83,7 +83,7 @@ MINPROGS=modprobe /usr/lib/klibc/bin/* $(wildcard /lib/libnss_files.so.* $(ARCH_
 NORMPROGS=rmmod halt busybox losetup $(call findprog,fdisk lspci lvm kexec) $(CRYPTOPROGS) $(VIDEOPROGS)
 
 TPM_PROGS=tcsd
-TPM_MODS=$(basename $(shell find $(MODDIR) -name "tpm*.ko"))
+TPM_MODS=$(basename $(basename $(shell find $(MODDIR) -name "tpm*.ko*")))
 
 PKCS11_PROGS=$(call findprog,openssl pcscd pkcs15-tool ifdhandler openct-control opensc-tool) /usr/lib/opensc-pkcs11.so /usr/lib/ssl/engines/engine_pkcs11.so $(shell find /usr/lib/pcsc/drivers -name "*.so") $(shell awk '/^LIBPATH/{print $$2}' /etc/reader.conf.d/*)
 PKCS11_FILES=/etc/opensc/opensc.conf  /etc/openct.conf $(wildcard /etc/reader.conf.d/*) $(shell find /usr/lib/pcsc/drivers -type f -not -name "*.so")
@@ -259,7 +259,7 @@ $(RAMDISK): $(RD_FILES) Makefile
 	test -z "$(APPEND)" || echo "$(APPEND)" >$(RD_DIR)/cmdline
 	grep -h -o "GROUP=[^ ]*" "$(RD_DIR)/lib/udev/rules.d"/*.rules | sed -e 's/GROUP="\([^"]*\)".*/^\1:/' | sort -u | grep -f - /etc/group | cut -f1-3 -d: | sed -e 's/$$/:/' >"$(RD_DIR)/etc/group"
 	test ! -x $(RD_DIR)/lib/systemd/systemd-udevd -o -x $(RD_DIR)/sbin/udevd || mv $(RD_DIR)/lib/systemd/systemd-udevd $(RD_DIR)/sbin/udevd
-	env MODDIR=$(MODDIR) KVERS=$(KVERS) ./moddep $(RD_DIR) -r "$(RELAXMODS)" $(sort $(basename $(notdir $(MODS))))
+	env MODDIR=$(MODDIR) KVERS=$(KVERS) ./moddep $(RD_DIR) -r "$(RELAXMODS)" $(sort $(basename $(basename $(notdir $(MODS)))))
 	test -z "$(NO_MAKEFLAGS)" || echo "$$MAKEFLAGS" >"$(RD_DIR)/.makeflags"
 	(cd "$(RD_DIR)"; find . -not -name . | fakeroot cpio -o -V -H newc) >"$(RAMDISK).tmp"
 	gzip -1 <"$(RAMDISK).tmp" >"$(RAMDISK)"
