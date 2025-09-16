@@ -14,6 +14,7 @@ kver="$(uname -r || true)"
 wpa_conf="/etc/wpa.conf"
 dev_console="dev/console"
 ntfs3g_opts="rw,uid=0,gid=4,fmask=0137,dmask=0027"
+running_config="/run/running-config"
 
 #
 # functions
@@ -855,6 +856,11 @@ mount_root() {
       test -z "$part_comp" || insert_root "$rr" "$part_comp"
     done
   done
+  test -z "$running_config" -o -d "$running_config" || {
+    mkdir -p "$running_config"
+    mount -t tmpfs -o mode=0755 running-config "$running_config"
+    insert_root "$rr" "$running_config"
+  }
   live="$(finalize_root "$rr" "$live")"
   test -z "$copy_up" || cleanup_mnt "$live/src"
   test "$(stat -c %D "$live")" = "$live_id" || mount -o move "$live" "$rr/live"
