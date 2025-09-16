@@ -68,7 +68,7 @@ FUSEMODS=fuse
 NTFSPROGS=$(call findprog,ntfs* scrounge-ntfs)
 
 UDEVPROGS=$(call findprog,udevd udevadm) $(shell find /lib/systemd/ -maxdepth 1 -name systemd-udevd -perm /1) $(shell find $$(dpkg -L udev | grep '^/lib/udev/[^/]*$$') -maxdepth 0 -type f -perm /1)
-UDEVFILES=$(shell dpkg -L udev dmsetup lvm2 | grep -E '^/lib/udev/(keymaps|(hwdb|rules).d)/') $(shell find /lib/udev/ -name hwdb.bin)
+UDEVFILES=$(shell dpkg -L udev dmsetup lvm2 | grep -E '/lib/udev/(keymaps|(hwdb|rules).d)/') $(shell find /lib/udev/ -name hwdb.bin)
 
 NETPROGS=$(wildcard /lib/libnss_dns.so.* /lib/libnss_files.so.* $(ARCH_LIB)/libnss_files.so.* $(ARCH_LIB)/libnss_dns.so.*) $(call findprog,telnet udp-[rs]e*er *mount.cifs socat xnbd-client)
 
@@ -200,7 +200,7 @@ endif
 ifndef MIN
 PROGS+=$(NORMPROGS)
 MODS+=$(NORMMODS)
-DATAFILES+=/lib/terminfo/l/linux /usr/share/misc/pci.ids
+DATAFILES+=/usr/share/terminfo/l/linux /usr/share/misc/pci.ids
 endif
 
 ifdef INST
