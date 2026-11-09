@@ -1,2 +1,3 @@
 /ramdisk*[0-9]
 /test.*
+/rd-init-rs/target/

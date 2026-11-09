@@ -9,6 +9,9 @@ MODDIR=/lib/modules/$(KVERS)/
 
 SHELL=/bin/bash
 PATH:=$(PATH):/sbin:/usr/sbin
+RUSTDIR=rd-init-rs
+RUST_INIT=$(RUSTDIR)/target/release/ramdisk-init
+RUST_DEPS=/usr/lib/x86_64-linux-gnu/libgcc_s.so.1
 RAMDISK=$(RAMDISK_DESTDIR)ramdisk$(RAMDISK_EXTRAS)-$(KVERS)
 ifndef RD_DIR
   RD_DIR:=$(shell mktemp -d /tmp/ramdisk.XXXXXX)
@@ -160,8 +163,8 @@ TEST_SFS:=test.sfs
 OVMF_FD?=/usr/share/qemu/OVMF.fd
 
 KVM_ROOT?=/dev/vda1:$(TEST_SFS)+mem
-KVM_APPEND=root=$(KVM_ROOT) quiet console=ttyS0
-KVM_OPTS=-nographic -m 512
+KVM_APPEND=root=$(KVM_ROOT) quiet console=ttyS0 panic=-1 debug
+KVM_OPTS=-nographic -m 512 -no-reboot
 
 ifdef KVM_ROOT_SMB
 KVM_ROOT=smb://%@$(KVM_ROOT_SMB)/*.sfs+:$(lastword $(subst :, ,$(KVM_ROOT_SMB)))/\$$arch/*kernel-\$$kver.sfs+mem
@@ -243,10 +246,11 @@ mrproper: clean
 
 test:	$(RAMDISK) $(TEST_IMG) $(TEST_PFLASH)
 	test -z $(REMOVE_RD_DIR) || $(RM) -r $(RD_DIR)
+	# should finish in 3-4 minutes
 	kvm -kernel /boot/vmlinuz-$(KVERS) -initrd $(RAMDISK) -drive if=virtio,file=$(TEST_IMG) -drive if=pflash,file=$(TEST_PFLASH) -append "$(KVM_APPEND)" $(KVM_OPTS)
 
 $(TEST_SFS):
-	mksquashfs - $@ -p "/ d 0755 0 0" -p "bin d 0755 0 0" -p "bin/busybox f 0755 0 0 cat $$(which busybox)" -p "bin/sh s 0755 0 0 busybox" -p "bin/init s 0755 0 0 busybox" -p "sbin s 0755 0 0 bin" -p "usr s 0755 0 0 ." -p "etc d 0755 0 0" -p "etc/inittab f 0644 0 0 echo ::respawn:/bin/sh"
+	mksquashfs - $@ -p "/ d 0755 0 0" -p "bin d 0755 0 0" -p "bin/busybox f 0755 0 0 cat $$(which busybox)" -p "bin/sh s 0755 0 0 busybox" -p "bin/printf s 0755 0 0 busybox" -p "bin/poweroff s 0755 0 0 busybox" -p "sbin d 0755 0 0" -p "sbin/init s 0755 0 0 ../bin/busybox" -p "usr s 0755 0 0 ." -p "etc d 0755 0 0" -p "etc/inittab f 0644 0 0 echo ::respawn:/bin/sh -c \"'printf \\\"Wait for 10 seconds to power off or press Enter for shell...\\\"; if read -t 10 _; then exec sh; else printf \\\"Shutting down..\\\"; poweroff; fi'\""
 
 $(TEST_IMG): $(TEST_SFS)
 	dd if=/dev/zero of=$@ bs=1024k seek=128 count=0
@@ -260,9 +264,15 @@ nfsroot:	clean
 	$(MAKE) $(MAKEFLAGS) TGT=nfsroot
 	cp $(RAMDISK) netinstall/tftp
 
-$(RAMDISK): $(RD_FILES) Makefile
+$(RUST_INIT): $(RUSTDIR)/Cargo.toml $(wildcard $(RUSTDIR)/src/*.rs)
+	cd $(RUSTDIR) && cargo build --release
+
+$(RAMDISK): $(RD_FILES) Makefile $(RUST_INIT)
 	cp -T -r $(RD_TMPL) $(RD_DIR)
 	env LANG=C ./copy_exe -m $(RD_DIR) $(PROGS)
+	cp $(RUST_INIT) "$(RD_DIR)/init"
+	chmod 0755 "$(RD_DIR)/init"
+	cp $(RUST_DEPS) "$(RD_DIR)/$(dir $(RUST_DEPS))"
 	test -z "$(DATADIRS)" || cp --parents -r $(DATADIRS) $(RD_DIR)
 	test -z "$(DATAFILES)" || cp --parents $(DATAFILES) $(RD_DIR)
 	test ! -e "$(RD_DIR)/sbin/udevadm" -o -e "$(RD_DIR)/sbin/udevsettle" || ln -s udevadm "$(RD_DIR)/sbin/udevsettle"
