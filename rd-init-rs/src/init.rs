@@ -3,6 +3,7 @@
 mod commands;
 mod config;
 mod finalize;
+mod loopdev;
 mod mounts;
 mod net;
 mod modules;
