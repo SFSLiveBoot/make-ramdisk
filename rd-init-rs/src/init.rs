@@ -734,40 +734,51 @@ impl Config {
                 };
                 live = source_mnt.clone();
 
-                let file = if copy_up {
-                    let pattern = format!(
-                        "{}/{}",
-                        source_mnt.trim_end_matches('/'),
-                        after.trim_start_matches('/')
-                    );
-                    let mut file: Option<String> = None;
+                let pattern = format!(
+                    "{}/{}",
+                    source_mnt.trim_end_matches('/'),
+                    after.trim_start_matches('/')
+                );
+                let mut files: Vec<String> = Vec::new();
+                if copy_up {
+                    // The rootfs is prefixed with `mem:`, so the component files should be copied into the tmpfs-backed /live before mounting.
                     for entry in glob::glob(&pattern)? {
                         let entry = entry?;
                         let file_name = entry.file_name().unwrap().to_string_lossy().into_owned();
                         let dst = format!("{}/{}", source_mnt.trim_end_matches('/'), file_name);
                         fs::copy(&entry, &dst)?;
-                        file = Some(dst);
+                        files.push(dst);
                     }
-                    file.unwrap_or_else(|| format!("{}/{}", source_mnt.trim_end_matches('/'), after.trim_start_matches('/')))
+                } else if after.contains('*') || after.contains('[') {
+                    // The component may be designated by a glob pattern (e.g. `*.sfs`), all matching files form stacked content layers.
+                    for entry in glob::glob(&pattern)? {
+                        let entry = entry?;
+                        files.push(entry.to_string_lossy().into_owned());
+                    }
                 } else {
-                    format!("{}/{}", source_mnt.trim_end_matches('/'), after.trim_start_matches('/'))
-                };
-
-                let file_name = file.rsplit('/').next().unwrap().to_string();
-                let target = format!("/.parts/{}", file_name);
-                if let Some(parent) = Path::new(&target).parent() {
-                    fs::create_dir_all(parent)?;
+                    files.push(pattern.clone());
                 }
-                fs::create_dir_all(&target)?;
-                let fstype = if file.ends_with(".sfs") {
-                    "squashfs".to_string()
-                } else {
-                    self.fs_type(&file)?
-                };
-                self.mount_loop(&file, &target, &fstype)?;
-                content_mounts.push(target.clone());
-                storage_mount = Some(source_mnt.clone());
-                mounted.push((part.clone(), target));
+                if files.is_empty() {
+                    anyhow::bail!("no files found matching pattern {}", pattern);
+                }
+
+                for file in files {
+                    let file_name = file.rsplit('/').next().unwrap().to_string();
+                    let target = format!("/.parts/{}", file_name);
+                    if let Some(parent) = Path::new(&target).parent() {
+                        fs::create_dir_all(parent)?;
+                    }
+                    fs::create_dir_all(&target)?;
+                    let fstype = if file.ends_with(".sfs") {
+                        "squashfs".to_string()
+                    } else {
+                        self.fs_type(&file)?
+                    };
+                    self.mount_loop(&file, &target, &fstype)?;
+                    content_mounts.push(target.clone());
+                    storage_mount = Some(source_mnt.clone());
+                    mounted.push((part.clone(), target));
+                }
             } else {
                 let target = format!("/.parts/{}", part);
                 fs::create_dir_all(&target)?;

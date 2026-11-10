@@ -161,9 +161,10 @@ TEST_IMG:=test.img
 TEST_PFLASH:=test.ovmf.fd
 TEST_ROOT_SFS:=00-root.sfs
 TEST_CONFIG_SFS:=15-config.sfs
+TEST_EXTRA_SFS:=50-extras.sfs
 OVMF_FD?=/usr/share/qemu/OVMF.fd
 
-KVM_ROOT?=/dev/vda1:$(TEST_ROOT_SFS)+:$(TEST_CONFIG_SFS)+mem
+KVM_ROOT?=/dev/vda1:*.sfs+:extras/*.sfs+mem
 KVM_APPEND=root=$(KVM_ROOT) quiet console=ttyS0 panic=-1 debug
 KVM_OPTS=-nographic -m 512 -no-reboot
 
@@ -254,12 +255,17 @@ $(TEST_ROOT_SFS):
 	mksquashfs - $@ -p "/ d 0755 0 0" -p "bin d 0755 0 0" -p "bin/busybox f 0755 0 0 cat $$(which busybox)" -p "bin/sh s 0755 0 0 busybox" -p "bin/printf s 0755 0 0 busybox" -p "bin/poweroff s 0755 0 0 busybox" -p "sbin d 0755 0 0" -p "sbin/init s 0755 0 0 ../bin/busybox" -p "usr s 0755 0 0 ." -p "etc d 0755 0 0" -p "etc/inittab f 0644 0 0 echo ::respawn:/bin/sh -c \"'printf \\\"[BAD-DEFAULT-CONFIG] inittab...\\\"; if read -t 10 _; then exec sh; else printf \\\"Shutting down..\\\"; poweroff; fi'\""
 
 $(TEST_CONFIG_SFS):
-	mksquashfs - $@ -p "/ d 0755 0 0" -p "etc d 0755 0 0" -p "etc/inittab f 0644 0 0 echo ::respawn:/bin/sh -c \"'printf \\\"[GOOD-CUSTOM-CONFIG] Wait for 10 seconds to power off or press Enter for shell...\\\"; if read -t 10 _; then exec sh; else printf \\\"Shutting down..\\\"; poweroff; fi'\""
+	mksquashfs - $@ -p "/ d 0755 0 0" -p "etc d 0755 0 0" -p "etc/inittab f 0644 0 0 echo ::respawn:/bin/sh -c \"'printf \\\"[GOOD-CUSTOM-CONFIG apps: \\\$$(echo /opt/*)] Wait for 10 seconds to power off or press Enter for shell...\\\"; if read -t 10 _; then exec sh; else printf \\\"Shutting down..\\\"; poweroff; fi'\""
 
-$(TEST_IMG): $(TEST_ROOT_SFS) $(TEST_CONFIG_SFS)
+$(TEST_EXTRA_SFS):
+	mksquashfs - $@ -p "/ d 0755 0 0" -p "opt d 0755 0 0" -p "opt/app01 d 0755 0 0"
+
+$(TEST_IMG): $(TEST_ROOT_SFS) $(TEST_CONFIG_SFS) $(TEST_EXTRA_SFS)
 	dd if=/dev/zero of=$@ bs=1024k seek=128 count=0
 	mformat -i $@ -F ::
 	mcopy -i $@ $(TEST_ROOT_SFS) $(TEST_CONFIG_SFS) ::
+	mmd -i $@ ::extras
+	mcopy -i $@ $(TEST_EXTRA_SFS) ::extras/
 
 $(TEST_PFLASH):
 	cp $(OVMF_FD) $@
