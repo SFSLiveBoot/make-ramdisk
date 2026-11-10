@@ -705,7 +705,7 @@ impl Config {
         let mut live_mounted = false;
         let mut live_mounts: Vec<String> = Vec::new();
         let mut mounted: Vec<(String, String)> = Vec::new();
-        let mut content_mount: Option<String> = None;
+        let mut content_mounts: Vec<String> = Vec::new();
         let mut storage_mount: Option<String> = None;
 
         for part in parts {
@@ -765,7 +765,7 @@ impl Config {
                     self.fs_type(&file)?
                 };
                 self.mount_loop(&file, &target, &fstype)?;
-                content_mount = Some(target.clone());
+                content_mounts.push(target.clone());
                 storage_mount = Some(source_mnt.clone());
                 mounted.push((part.clone(), target));
             } else {
@@ -776,7 +776,7 @@ impl Config {
                     storage_mount = Some(target.clone());
                 } else if part.ends_with(".sfs") {
                     self.mount_loop(&part, &target, "squashfs")?;
-                    content_mount = Some(target.clone());
+                    content_mounts.push(target.clone());
                 } else {
                     self.mount_source(&part, &target)?;
                     storage_mount = Some(target.clone());
@@ -785,8 +785,17 @@ impl Config {
             }
         }
 
-        // Finally mount them all together as overlayfs on /realroot, with lowerdir on the last part.
-        let lower = content_mount.clone().unwrap_or_else(|| mounted.last().map(|m| m.1.clone()).unwrap_or_default());
+        // Finally mount them all together as overlayfs on /realroot, with all content parts stacked as lower layers, the last mounted part on top of the earlier ones.
+        let lower = if content_mounts.is_empty() {
+            mounted.last().map(|m| m.1.clone()).unwrap_or_default()
+        } else {
+            content_mounts
+                .iter()
+                .rev()
+                .map(|s| s.as_str())
+                .collect::<Vec<&str>>()
+                .join(":")
+        };
         fs::create_dir_all("/realroot/.parts")?;
         let (upper, work) = if let Some(storage) = storage_mount.clone() {
             (

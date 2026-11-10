@@ -159,10 +159,11 @@ endif
 
 TEST_IMG:=test.img
 TEST_PFLASH:=test.ovmf.fd
-TEST_SFS:=test.sfs
+TEST_ROOT_SFS:=00-root.sfs
+TEST_CONFIG_SFS:=15-config.sfs
 OVMF_FD?=/usr/share/qemu/OVMF.fd
 
-KVM_ROOT?=/dev/vda1:$(TEST_SFS)+mem
+KVM_ROOT?=/dev/vda1:$(TEST_ROOT_SFS)+:$(TEST_CONFIG_SFS)+mem
 KVM_APPEND=root=$(KVM_ROOT) quiet console=ttyS0 panic=-1 debug
 KVM_OPTS=-nographic -m 512 -no-reboot
 
@@ -249,13 +250,16 @@ test:	$(RAMDISK) $(TEST_IMG) $(TEST_PFLASH)
 	# should finish in 3-4 minutes
 	kvm -kernel /boot/vmlinuz-$(KVERS) -initrd $(RAMDISK) -drive if=virtio,file=$(TEST_IMG) -drive if=pflash,file=$(TEST_PFLASH) -append "$(KVM_APPEND)" $(KVM_OPTS)
 
-$(TEST_SFS):
-	mksquashfs - $@ -p "/ d 0755 0 0" -p "bin d 0755 0 0" -p "bin/busybox f 0755 0 0 cat $$(which busybox)" -p "bin/sh s 0755 0 0 busybox" -p "bin/printf s 0755 0 0 busybox" -p "bin/poweroff s 0755 0 0 busybox" -p "sbin d 0755 0 0" -p "sbin/init s 0755 0 0 ../bin/busybox" -p "usr s 0755 0 0 ." -p "etc d 0755 0 0" -p "etc/inittab f 0644 0 0 echo ::respawn:/bin/sh -c \"'printf \\\"Wait for 10 seconds to power off or press Enter for shell...\\\"; if read -t 10 _; then exec sh; else printf \\\"Shutting down..\\\"; poweroff; fi'\""
+$(TEST_ROOT_SFS):
+	mksquashfs - $@ -p "/ d 0755 0 0" -p "bin d 0755 0 0" -p "bin/busybox f 0755 0 0 cat $$(which busybox)" -p "bin/sh s 0755 0 0 busybox" -p "bin/printf s 0755 0 0 busybox" -p "bin/poweroff s 0755 0 0 busybox" -p "sbin d 0755 0 0" -p "sbin/init s 0755 0 0 ../bin/busybox" -p "usr s 0755 0 0 ." -p "etc d 0755 0 0" -p "etc/inittab f 0644 0 0 echo ::respawn:/bin/sh -c \"'printf \\\"[BAD-DEFAULT-CONFIG] inittab...\\\"; if read -t 10 _; then exec sh; else printf \\\"Shutting down..\\\"; poweroff; fi'\""
 
-$(TEST_IMG): $(TEST_SFS)
+$(TEST_CONFIG_SFS):
+	mksquashfs - $@ -p "/ d 0755 0 0" -p "etc d 0755 0 0" -p "etc/inittab f 0644 0 0 echo ::respawn:/bin/sh -c \"'printf \\\"[GOOD-CUSTOM-CONFIG] Wait for 10 seconds to power off or press Enter for shell...\\\"; if read -t 10 _; then exec sh; else printf \\\"Shutting down..\\\"; poweroff; fi'\""
+
+$(TEST_IMG): $(TEST_ROOT_SFS) $(TEST_CONFIG_SFS)
 	dd if=/dev/zero of=$@ bs=1024k seek=128 count=0
 	mformat -i $@ -F ::
-	mcopy -i $@ $(TEST_SFS) ::
+	mcopy -i $@ $(TEST_ROOT_SFS) $(TEST_CONFIG_SFS) ::
 
 $(TEST_PFLASH):
 	cp $(OVMF_FD) $@
